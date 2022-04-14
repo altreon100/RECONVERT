@@ -7,11 +7,12 @@ Ce projet est découpé en plusieurs thématique (numérique,environnemental,soc
 
 # PARTIE NUMERIQUE
 
-Dans le cadre de ce projet, il a été décidé de faire une simulation des différents bâtiments à déconstruire et de voir l'évolution des flux de matériaux au fil de leur déconstruction. Le simulateur GAMA a été choisi afin d'obtenir une SMA (Simulation Multi Agent) optimisé. Dans cette SMA nous avons plusieurs agents à savoir :
+Dans le cadre de ce projet, il a été décidé de faire une simulation des différents bâtiments à déconstruire et de voir l'évolution des flux de matériaux au fil de leur déconstruction. Les agents doivent optimiser au mieux leur temps afin de déconstruire (voir reconstruire dans un second temps) les bâtiments le plus efficacement possible. Le simulateur GAMA a été choisi afin d'obtenir une SMA (Simulation Multi Agent) optimisé. Dans cette SMA nous avons plusieurs agents à savoir :
 
 - les bâtiments à déconstruire 
 - les zones de stockage/ressourcerie qui permettent aux matériaux récupérés d'être recyclés
 - les unités opératives qui permettent la déconstruction des bâtiments
 
-Afin de faire cette simulation, il a été necessaire de récupérer les données SIG(Système d'Information Géographique) de la MEL afin de pouvoir les traiter dans GAMA. Pour cela, il faut télécharger et installer QGIS sur votre PC via ce lien: https://www.qgis.org/fr/site/forusers/download.html. 
+Afin de faire cette simulation, il a été necessaire de récupérer les données SIG(Système d'Information Géographique) de la MEL afin de pouvoir les traiter dans GAMA. Pour cela, il faut télécharger et installer QGIS sur votre PC via ce lien: https://www.qgis.org/fr/site/forusers/download.html.
+
 Ensuite il faut télécharger les données SIG de la France grâce à ce lien :https://bdnb-data.s3.fr-par.scw.cloud/bnb_export.gpkg.zip
