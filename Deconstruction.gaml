@@ -194,7 +194,7 @@ species people skills:[moving]{ // Unité opérative
 			}
 		}*/
 	// Les decay_matériaux diminue le matériaux d'un certain nombre et l'envoi dans le centre de tri le plus proche
-	reflex decay_brique when: nb_building!=0 and batiment.color=#blue{
+	reflex decay_brique when: nb_building!=0 and batiment.color=#blue and batiment.brique!=0{
 		find_new_centre<-false;
 		if batiment.brique>4.0{
 			batiment.brique<-batiment.brique -4.0;
@@ -230,7 +230,7 @@ species people skills:[moving]{ // Unité opérative
 			batiment.brique<-0.0;
 		}		
 	}
-	reflex decay_verre when: nb_building!=0 and batiment.color=#blue and batiment.brique=0{
+	reflex decay_verre when: nb_building!=0 and batiment.color=#blue and batiment.brique=0 and batiment.verre!=0{
 		find_new_centre<-false;
 		if batiment.verre>3.0{
 			batiment.verre<-batiment.verre -3.0;
@@ -266,7 +266,7 @@ species people skills:[moving]{ // Unité opérative
 			batiment.verre<-0.0;
 		}		
 	}
-	reflex decay_bois when: nb_building!=0 and batiment.color=#blue and batiment.verre=0 and batiment.brique=0{
+	reflex decay_bois when: nb_building!=0 and batiment.color=#blue and batiment.verre=0 and batiment.brique=0 and batiment.bois!=0{
 		find_new_centre<-false;
 		if batiment.bois>5.0{
 			batiment.bois<-batiment.bois -5.0;
@@ -302,7 +302,7 @@ species people skills:[moving]{ // Unité opérative
 			batiment.bois<-0.0;
 		}		
 	}
-	reflex decay_pierre when: nb_building!=0 and batiment.color=#blue and batiment.bois=0 and batiment.verre=0 and batiment.brique=0{
+	reflex decay_pierre when: nb_building!=0 and batiment.color=#blue and batiment.bois=0 and batiment.verre=0 and batiment.brique=0 and batiment.pierre!=0{
 		find_new_centre<-false;
 		if batiment.pierre>5.0{
 			batiment.pierre<-batiment.pierre -5.0;
@@ -338,7 +338,7 @@ species people skills:[moving]{ // Unité opérative
 			batiment.pierre<-0.0;
 		}		
 	}
-	reflex decay_beton when: nb_building!=0 and batiment.color=#blue and batiment.pierre=0 and batiment.bois=0 and batiment.verre=0 and batiment.brique=0{
+	reflex decay_beton when: nb_building!=0 and batiment.color=#blue and batiment.pierre=0 and batiment.bois=0 and batiment.verre=0 and batiment.brique=0 and batiment.beton!=0{
 		find_new_centre<-false;
 		if batiment.beton>4.0{
 			batiment.beton<-batiment.beton -4.0;
@@ -374,7 +374,7 @@ species people skills:[moving]{ // Unité opérative
 			batiment.beton<-0.0;
 		}		
 	}
-	reflex decay_pvc when: nb_building!=0 and batiment.color=#blue and batiment.beton=0 and batiment.pierre=0 and batiment.bois=0 and batiment.verre=0 and batiment.brique=0{
+	reflex decay_pvc when: nb_building!=0 and batiment.color=#blue and batiment.pvc!=0 and batiment.beton=0 and batiment.pierre=0 and batiment.bois=0 and batiment.verre=0 and batiment.brique=0{
 		find_new_centre<-false;
 		if batiment.pvc>3.0{
 			batiment.pvc<-batiment.pvc -3.0;
