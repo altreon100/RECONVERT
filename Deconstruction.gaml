@@ -5,7 +5,7 @@ global {
 	file shape_file_bounds <- file("../includes/RECONVERT/bounds.shp"); //Fichier shape d'un rectangle contenant la zone choisi 
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
 	float step <- 10 #mn; //correspond au temps entre chaque cycle 
-	int nb_people<-20; // nombre d'unité opérative 
+	int nb_people<-5; // nombre d'unité opérative 
 	int id<-0; // l'id de tout les bâtiment 
 	int nb_building<-0; // calcul en temps réel le nombre de bâtiment qui reste à déconstruire 
 	int nb_contrat<-0; // calcul en temps réel le nombre de contrat qui reste 
@@ -15,9 +15,9 @@ global {
 	int nb_tri<-0; //calcul le nombre de centre de tri
 	
 	init {
-		create building  from: shape_file_buildings with: [type::string(read ("adedpe2056"))]{ //On lit la donnée dans le tableau qui donne le type du bâtiment
+		create building  number:1000 from: shape_file_buildings with: [type::string(read ("adedpe2056"))]{ //On lit la donnée dans le tableau qui donne le type du bâtiment
 			if type="Non résidentiel" { // On considère qu'il s'agit d'un centre de tri et on lui affecte les valeurs de départ
-				if(id>=0 and id<40){ //Pour les 40 premiers bâtiments on suppose qu'ils sont des zones de stockage (capacité très forte)
+				if(id>=0 and id<20){ //Pour les 40 premiers bâtiments on suppose qu'ils sont des zones de stockage (capacité très forte)
 					color <- #green ;
 					brique <-0.0;
 					verre <-0.0;
@@ -124,7 +124,6 @@ species building {
 	float pvc;
 	float beton;
 	float pierre;
-	
 	float mat_total; // Calcul du total de matériaux restant 
 	int id_building; // L'id du bâtiment
 	float capacite; // Pour les centre de tri correspond à la capacité maximale du centre
@@ -140,10 +139,11 @@ species building {
 			capacite<-capacite+0.4;
 			total_capacite<-total_capacite+0.4;
 		}
-		else{
-			brique<-0.0;
+		else if brique>0.0{
+			
 			capacite<-capacite+brique;
 			total_capacite<-total_capacite+brique;
+			brique<-0.0;
 		}
 	}
 	reflex decay_verre when:color=#red{
@@ -152,10 +152,11 @@ species building {
 			capacite<-capacite+0.3;
 			total_capacite<-total_capacite+0.3;
 		}
-		else{
-			verre<-0.0;
+		else if verre>0.0{
+			
 			capacite<-capacite+verre;
 			total_capacite<-total_capacite+verre;
+			verre<-0.0;
 		}
 	}
 	reflex decay_bois when:color=#red{
@@ -164,10 +165,11 @@ species building {
 			capacite<-capacite+0.5;
 			total_capacite<-total_capacite+0.5;
 		}
-		else{
-			bois<-0.0;
+		else if bois>0.0{
+			
 			capacite<-capacite+bois;
 			total_capacite<-total_capacite+bois;
+			bois<-0.0;
 		}
 	}
 	reflex decay_pierre when:color=#red{
@@ -176,10 +178,11 @@ species building {
 			capacite<-capacite+0.5;
 			total_capacite<-total_capacite+0.5;
 		}
-		else{
-			pierre<-0.0;
+		else if pierre>0.0{
+			
 			capacite<-capacite+pierre;
 			total_capacite<-total_capacite+pierre;
+			pierre<-0.0;
 		}
 	}
 	reflex decay_beton when:color=#red{
@@ -188,10 +191,11 @@ species building {
 			capacite<-capacite+0.4;
 			total_capacite<-total_capacite+0.4;
 		}
-		else{
-			beton<-0.0;
+		else if beton>0.0{
+			
 			capacite<-capacite+beton;
 			total_capacite<-total_capacite+beton;
+			beton<-0.0;
 		}
 	}
 	reflex decay_pvc when:color=#red{
@@ -200,10 +204,11 @@ species building {
 			capacite<-capacite+0.3;
 			total_capacite<-total_capacite+0.3;
 		}
-		else{
-			pvc<-0.0;
+		else if pvc>0.0{
+			
 			capacite<-capacite+pvc;
 			total_capacite<-total_capacite+pvc;
+			pvc<-0.0;
 		}
 	}
 	reflex tot{ // calcul le total de matériaux restant 
@@ -265,7 +270,6 @@ species people skills:[moving]{ // Unité opérative
 			else{ // Si le centre de tri le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=4.0 and find_new_centre=false){
-						batiment.brique<-batiment.brique-4.0;
 						list_traitement[i].brique<-list_traitement[i].brique+4.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-4.0;
 						total_capacite<-total_capacite-4.0;
@@ -314,7 +318,6 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=3.0 and find_new_centre=false){
-						batiment.verre<-batiment.verre-3.0;
 						list_traitement[i].verre<-list_traitement[i].verre+3.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-3.0;
 						total_capacite<-total_capacite-3.0;
@@ -365,7 +368,6 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=5.0 and find_new_centre=false){
-						batiment.bois<-batiment.bois-5.0;
 						list_traitement[i].bois<-list_traitement[i].bois+5.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-5.0;
 						total_capacite<-total_capacite-5.0;
@@ -414,7 +416,6 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=5.0 and find_new_centre=false){
-						batiment.pierre<-batiment.pierre-5.0;
 						list_traitement[i].pierre<-list_traitement[i].pierre+5.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-5.0;
 						total_capacite<-total_capacite-5.0;
@@ -436,7 +437,7 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=batiment.pierre and find_new_centre=false){
-						list_traitement[i].pierre<-list_traitement[i].bois+batiment.pierre;
+						list_traitement[i].pierre<-list_traitement[i].pierre+batiment.pierre;
 						list_traitement[i].capacite<-list_traitement[i].capacite-batiment.pierre;
 						total_capacite<-total_capacite-batiment.pierre;
 						find_new_centre<-true;
@@ -464,7 +465,6 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=4.0 and find_new_centre=false){
-						batiment.beton<-batiment.beton-4.0;
 						list_traitement[i].beton<-list_traitement[i].beton+4.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-4.0;
 						total_capacite<-total_capacite-4.0;
@@ -486,7 +486,7 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=batiment.beton and find_new_centre=false){
-						list_traitement[i].beton<-list_traitement[i].brique+batiment.beton;
+						list_traitement[i].beton<-list_traitement[i].beton+batiment.beton;
 						list_traitement[i].capacite<-list_traitement[i].capacite-batiment.beton;
 						total_capacite<-total_capacite-batiment.beton;
 						find_new_centre<-true;
@@ -514,7 +514,6 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=3.0 and find_new_centre=false){
-						batiment.pvc<-batiment.pvc-3.0;
 						list_traitement[i].pvc<-list_traitement[i].pvc+3.0;
 						list_traitement[i].capacite<-list_traitement[i].capacite-3.0;
 						total_capacite<-total_capacite-3.0;
@@ -536,7 +535,7 @@ species people skills:[moving]{ // Unité opérative
 			else{
 				loop i from:0 to:length(list_traitement)-1{
 					if(list_traitement[i].capacite>=batiment.pvc and find_new_centre=false){
-						list_traitement[i].pvc<-list_traitement[i].verre+batiment.pvc;
+						list_traitement[i].pvc<-list_traitement[i].pvc+batiment.pvc;
 						list_traitement[i].capacite<-list_traitement[i].capacite-batiment.pvc;
 						total_capacite<-total_capacite-batiment.pvc;
 						find_new_centre<-true;
@@ -636,5 +635,7 @@ experiment road_traffic type: gui {
 		monitor "Number of building" value:nb_building;
 		monitor "Number of centre stockage" value:nb_stockage;
 		monitor "Number of centre tri" value:nb_tri;
+		monitor "number of capacité" value:total_capacite;
+		monitor "number of init capacité" value:init_tot_capacite;
 	}
 }
