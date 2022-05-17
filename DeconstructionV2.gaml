@@ -3,9 +3,10 @@ model tutorial_gis_city_traffic
 global {
 	file shape_file_buildings <- file("../includes/RECONVERT/lille.shp"); // Fichier shape contenant les bâtiments de la zone à étudier
 	file shape_file_bounds <- file("../includes/RECONVERT/bounds.shp"); //Fichier shape d'un rectangle contenant la zone choisi
-	file my_csv_file <- csv_file("../includes/RECONVERT/001ORDER.csv",","); 
+	file ordre_mat <- csv_file("../includes/RECONVERT/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
+	file note<-csv_file("../includes/RECONVERT/002NOTE0.csv");
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
-	float step <- 10 #mn; //correspond au temps entre chaque cycle 
+	float step <- 0.5#day; //correspond au temps entre chaque cycle 
 	int nb_people<-5; // nombre d'unité opérative 
 	int id<-0; // l'id de tout les bâtiment 
 	int nb_building<-0; // calcul en temps réel le nombre de bâtiment qui reste à déconstruire 
@@ -14,24 +15,46 @@ global {
 	float init_tot_capacite<-0.0;
 	int nb_stockage<-0; // calcul le nombre de centre de stockage
 	int nb_tri<-0; //calcul le nombre de centre de tri
-	point size<-[1,38];
+	
 	
 	init {
-		matrix<string> data <- matrix(my_csv_file);
-		matrix<string> test<-copy(data);
+		matrix<string> matrix_ordre <- matrix(ordre_mat);
+		matrix<string> copy_mat<-copy(matrix_ordre);
+		matrix<string> matrix_note<-matrix(note);
+		
+		point size<-[1,matrix_ordre.rows];
 		int nb<-0;
 		string ordre<-nil;
 		loop i from: 1 to: 8{
 		ordre<-string(i);
-			loop j from: 0 to: data.rows -1{
-				if(test[2,j] contains ordre){
-					data[0,nb]<-test[0,j];
-					data[1,nb]<-test[1,j];
-					data[2,nb]<-test[2,j];
+			loop j from: 0 to: matrix_ordre.rows -1{
+				if(copy_mat[2,j] contains ordre){
+					matrix_ordre[0,nb]<-copy_mat[0,j];
+					matrix_ordre[1,nb]<-copy_mat[1,j];
+					matrix_ordre[2,nb]<-copy_mat[2,j];
 					nb<-nb+1;
 				}
 			}	
 		}
+		matrix<string>note_ordre<-nil;
+		
+		matrix_note<-transpose(matrix_ordre);
+		point size2<-[matrix_ordre.columns,10];
+		note_ordre<-matrix_with(size2,"0.0");
+		
+		
+		loop i from: 0 to: matrix_ordre.columns-1{
+				loop j from:0 to:matrix_ordre.columns-1{
+					if(matrix_ordre[i,1]=matrix_ordre[1,j]){
+						loop k from:2 to: matrix_ordre.rows-1{
+							note_ordre[j,k-2]<-matrix_ordre[i,k];
+						}
+					}	
+				}
+				
+		}
+		note_ordre<-transpose(note_ordre);
+		
 		create building  number:500 from: shape_file_buildings with: [type::string(read ("adedpe2056"))]{ //On lit la donnée dans le tableau qui donne le type du bâtiment
 			if type="Non résidentiel" { // On considère qu'il s'agit d'un centre de tri et on lui affecte les valeurs de départ
 				if(id>=0 and id<20){ //Pour les 40 premiers bâtiments on suppose qu'ils sont des zones de stockage (capacité très forte)
