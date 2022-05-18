@@ -38,22 +38,23 @@ global {
 		}
 		matrix<string>note_ordre<-nil;
 		
-		matrix_note<-transpose(matrix_ordre);
-		point size2<-[matrix_ordre.columns,10];
+		matrix_note<-transpose(matrix_note);
+		point size2<-[matrix_note.columns,10];
 		note_ordre<-matrix_with(size2,"0.0");
 		
 		
-		loop i from: 0 to: matrix_ordre.columns-1{
-				loop j from:0 to:matrix_ordre.columns-1{
-					if(matrix_ordre[i,1]=matrix_ordre[1,j]){
-						loop k from:2 to: matrix_ordre.rows-1{
-							note_ordre[j,k-2]<-matrix_ordre[i,k];
+		loop i from: 0 to: matrix_note.columns-1{
+				loop j from:0 to:matrix_note.columns-1{
+					if(matrix_note[i,1]=matrix_ordre[1,j]){
+						loop k from:2 to: matrix_note.rows-1{
+							note_ordre[j,k-2]<-matrix_note[i,k];
 						}
 					}	
 				}
 				
 		}
 		note_ordre<-transpose(note_ordre);
+		
 		
 		create building  number:500 from: shape_file_buildings with: [type::string(read ("adedpe2056"))]{ //On lit la donnée dans le tableau qui donne le type du bâtiment
 			if type="Non résidentiel" { // On considère qu'il s'agit d'un centre de tri et on lui affecte les valeurs de départ
@@ -142,9 +143,10 @@ global {
 				
 			}
 			centre_tri<-list_traitement[0]; // Le centre de tri principal de l'agent est celui le plus proche
-			speed<-3#km/#h; // Correspond à la vitesse de déplacement de l'agent lors du changement de bâtiment
+			speed<-50#km/#h; // Correspond à la vitesse de déplacement de l'agent lors du changement de bâtiment
 		}
 	}
+	
 }
 
 species building { 
@@ -345,10 +347,6 @@ experiment road_traffic type: gui {
 				data "tot_capacité" value:(1-(total_capacite/init_tot_capacite))*100 color:#red;
 			}
 		}
-		monitor "Number of building" value:nb_building;
-		monitor "Number of centre stockage" value:nb_stockage;
-		monitor "Number of centre tri" value:nb_tri;
-		monitor "number of capacité" value:total_capacite;
-		monitor "number of init capacité" value:init_tot_capacite;
+		monitor "Number of building" value: nb_building;
 	}
 }
