@@ -1,10 +1,14 @@
 model tutorial_gis_city_traffic
 
 global {
-	file shape_file_buildings <- file("../includes/RECONVERT/lille.shp"); // Fichier shape contenant les bâtiments de la zone à étudier
-	file shape_file_bounds <- file("../includes/RECONVERT/bounds.shp"); //Fichier shape d'un rectangle contenant la zone choisi
-	file ordre_mat <- csv_file("../includes/RECONVERT/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
-	file note<-csv_file("../includes/RECONVERT/002NOTE0.csv");
+	file shape_file_buildings <- file("../includes/lille.shp"); // Fichier shape contenant les bâtiments de la zone à étudier
+	file shape_file_bounds <- file("../includes/bounds.shp"); //Fichier shape d'un rectangle contenant la zone choisi
+	file ordre_mat <- csv_file("../includes/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
+	file note<-csv_file("../includes/002NOTE0.csv");
+	file note1<-csv_file("../includes/003NOTE1.csv");
+	file note2<-csv_file("../includes/004NOTE2.csv");
+	file note3<-csv_file("../includes/005NOTE3.csv");
+	file note4<-csv_file("../includes/006NOTE4.csv");
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle 
 	int nb_people<-5; // nombre d'unité opérative 
@@ -333,9 +337,6 @@ species people skills:[moving]{ // Unité opérative
 }
 
 experiment road_traffic type: gui {
-	parameter "Shapefile for the buildings:" var: shape_file_buildings category: "GIS" ;
-	parameter "Shapefile for the bounds:" var: shape_file_bounds category: "GIS" ;
-	parameter "Number of people agents" var:nb_people category:"People";
 
 	output {
 		display city_display type:opengl {
