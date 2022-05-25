@@ -7,43 +7,45 @@ global {
 	file shape_file_stockage <- file("../includes/centre_stockage.shp"); //Fichier shape d'un rectangle contenant la zone choisi
 	file shape_file_valo <- file("../includes/centre_valo.shp"); //Fichier shape d'un rectangle contenant la zone choisi
 	file ordre_mat <- csv_file("../includes/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
+	//Fichiers avec le pourcentage de sorti des matériaux en fonction de la note
 	file note0<-csv_file("../includes/002NOTE0.csv");
 	file note1<-csv_file("../includes/003NOTE1.csv");
 	file note2<-csv_file("../includes/004NOTE2.csv");
 	file note3<-csv_file("../includes/005NOTE3.csv");
 	file note4<-csv_file("../includes/006NOTE4.csv");
+	
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle 
 	int nb_people<-10; // nombre d'unité opérative  
-	int id<-0;
+	int id<-0; //l'id de tout les bâtiment
 	int nb_building<-0; // calcul en temps réel le nombre de bâtiment qui reste à déconstruire 
 	int nb_contrat<-0; // calcul en temps réel le nombre de contrat qui reste 
 	float total_capacite<-0.0;// Permet de calculer le taux d'occupation des centres de tri
-	float total_capacite2<-0.0;
+	float total_capacite2<-0.0; // Permet de calculer le taux d'occupation des centres de valo
 	float init_tot_capacite<-0.0;
 	float init_tot_capacite2<-0.0;
 	int nb_stockage<-0; // calcul le nombre de centre de stockage
-	int nb_valo<-0;
+	int nb_valo<-0;//calcul le nombre de centre de valo
 	int nb_tri<-0; //calcul le nombre de centre de tri
-	float decay_building<-8.0;
-	matrix<float> note_ordre<-nil;
+	float decay_building<-8.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
+	matrix<float> note_ordre<-nil; 
 	
 	
 	init {
-		matrix<string> matrix_ordre <- matrix(ordre_mat);
+		matrix<string> matrix_ordre <- matrix(ordre_mat); // On récupère le tableau de l'ordre de sorti et on enlève les "" propre aux fichiers CSV
 		loop i from: 0 to: matrix_ordre.rows -1{
 			matrix_ordre[0,i]<-copy_between(matrix_ordre[0,i],1,length(matrix_ordre[0,i]));
 			matrix_ordre[2,i]<-copy_between(matrix_ordre[2,i],0,1);
 		}
 		matrix<string> copy_mat<-copy(matrix_ordre);
-		matrix<string> matrix_note<-matrix(note0);
+		matrix<string> matrix_note<-matrix(note0);// Idem ici il s'agit du tableau de note/ IL FAUT CHANGER LE NOMBRE APRES "matrix(note*)" POUR CHANGER LE FICHIER LU 
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
 			matrix_note[11,i]<-copy_between(matrix_note[2,i],0,length(matrix_note[0,i])-1);
 		}
 		
-		point size<-point([1,matrix_ordre.rows]);
+		point size<-point([1,matrix_ordre.rows]); // On ordonne le fichier par ordre de sorti
 		int nb<-0;
 		loop i from: 1 to: 8{
 			loop j from: 0 to: matrix_ordre.rows -1{
@@ -62,7 +64,7 @@ global {
 		note_ordre<-matrix_with(size2,0.0);
 		
 		
-		loop i from: 0 to: matrix_note.columns-1{
+		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages
 				loop j from:0 to:matrix_note.columns-1{
 					if(matrix_note[i,1]=matrix_ordre[1,j]){
 						loop k from:2 to: matrix_note.rows-2{
@@ -85,7 +87,7 @@ global {
 
 		}*/
 		
-		create centre_stockages from:shape_file_stockage{
+		create centre_stockages from:shape_file_stockage{ // creation des centres de stockages avec une forte capacité
 					capacite<-1000.0;	
 					nb_stockage<-nb_stockage+1;
 					materiaux<-matrix_with(size,0.0);
@@ -93,7 +95,7 @@ global {
 						materiaux[0,i]<-0;
 					}	
 		}
-		create centre_tri from:shape_file_tri{
+		create centre_tri from:shape_file_tri{ // creation des centres de tri
 			capacite<-70.0;
 			total_capacite<-total_capacite+capacite;
 			init_tot_capacite<-init_tot_capacite+capacite;
@@ -103,7 +105,7 @@ global {
 						materiaux[0,i]<-0;
 					}
 		}
-		create centre_valo from: shape_file_valo{
+		create centre_valo from: shape_file_valo{ //création des centres de valorisation
 			capacite<-70.0;
 			total_capacite2<-total_capacite2+capacite;
 			init_tot_capacite2<-init_tot_capacite2+capacite;
@@ -113,7 +115,7 @@ global {
 						materiaux[0,i]<-0;
 					}
 		}
-		create deconstruction from:shape_file_buildings{
+		create deconstruction from:shape_file_buildings{ // création des bâtiments à déconstruire
 			id_building<-id+1;
 			id<-id+1;
 			nb_building<-nb_building+1;
@@ -125,7 +127,7 @@ global {
 				}
 		}
 		
-		create people number: nb_people {
+		create people number: nb_people { // creation des unités opératives
 			batiment<-one_of(deconstruction);
 			location <- any_location_in (batiment); // on affecte à l'agent une localisation aléatoire en choississant 1 bâtiment de la liste
 			nb_contrat<-nb_contrat-1;
@@ -149,7 +151,7 @@ global {
 					myself.distance_stock[i]<-self distance_to myself;
 				}
 			}
-			loop i from:0 to:length(list_valo)-1{   // On calcule la distance entre l'agent et tous les centres de stockage existant
+			loop i from:0 to:length(list_valo)-1{   // On calcule la distance entre l'agent et tous les centres de valorisation existant
 				ask list_valo at i{
 					myself.distance_valo[i]<-self distance_to myself;
 				}
@@ -176,7 +178,7 @@ global {
 			tmp_dist<-copy(distance_valo);
 			tmp_centre<-copy(list_valo);
 			distance_valo<-distance_valo sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de tri par ordre croissant de distance
+			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de valorisation par ordre croissant de distance
 				loop j from:0 to: length(list_valo)-1{
 					if(distance_valo[i]=tmp_dist[j]){
 						list_valo[i]<-tmp_centre[j];
@@ -184,7 +186,7 @@ global {
 				}
 			}
 			centre_trie<-list_traitement[0]; // Le centre de tri principal de l'agent est celui le plus proche
-			centre_val<-list_valo[0];
+			centre_val<-list_valo[0]; // le centre de valorisation le plus proche devient le principal
 			speed<-50#km/#h; // Correspond à la vitesse de déplacement de l'agent lors du changement de bâtiment
 		}
 	}
@@ -193,13 +195,11 @@ global {
 
 species building { 
 	rgb color;
-	// correspond aux différents matériaux du bâtiment
 	float mat_total<-0.0; // Calcul du total de matériaux restant 
 	float capacite; // Pour les centre de tri correspond à la capacité maximale du centre
-	matrix<float>  materiaux<-nil;
-	int id_building;
+	matrix<float>  materiaux<-nil; // liste de tous les matériaux existant
+	int id_building; // id du batiment
 	
-	// Pour les centre de tri les reflex decay_typeMatériaux réduisent la quantité du  matériaux d'un certains nombre et augmente la capacité
 	
 	reflex tot{ // calcul le total de matériaux restant 
 		mat_total<-0.0;
@@ -217,16 +217,13 @@ species building {
 	}
 }
 
-species centre_stockages parent:building { 
+species centre_stockages parent:building {  // les centres de stockage sont passifs il n'y a pas de sorti
 	rgb color<-#green;
-	// correspond aux différents matériaux du bâtiment
-	
-	// Pour les centre de tri les reflex decay_typeMatériaux réduisent la quantité du  matériaux d'un certains nombre et augmente la capacité
 	
 	
 }
 
-species centre_tri parent:building { 
+species centre_tri parent:building {  // les centres de tri vont disparaître une certaine quantité par step
 	rgb color<-#red;
 	
 	reflex decay{
@@ -243,10 +240,9 @@ species centre_tri parent:building {
 			}
 		}
 	}
-	// correspond aux différents matériaux du bâtiment
 }
 
-species centre_valo parent:building { 
+species centre_valo parent:building { // les centres de valorisation vont disparaître une certaine quantité par step
 	rgb color<-#orange;
 	reflex decay {
 		loop i from:0 to:materiaux.rows-1{
@@ -269,7 +265,6 @@ species centre_valo parent:building {
 }
 
 species deconstruction parent:building { 
-	float mat_total<-0.0; // Calcul du total de matériaux restant 
 	bool deconstruction<-false; // Si le bâtiment est en cours de déconstruction
 	rgb color<-#blue;
 }
@@ -296,7 +291,7 @@ species people skills:[moving]{ // Unité opérative
 	bool sol;
 	bool find_new_centre_valo;
 	
-	// Les decay diminue le matériaux d'un certain nombre et l'envoi dans le centre de tri le plus proche
+	// Les decay diminue le matériaux d'un certain nombre et l'envoi dans les centres  les plus proche
 	reflex decay when: nb_building!=0 and batiment.color=#blue {
 		find_new_centre<-false;
 		find_new_centre_valo<-false;
@@ -306,10 +301,11 @@ species people skills:[moving]{ // Unité opérative
 				sol<-true;
 				if (batiment.materiaux[0,i]>=decay_building){
 					batiment.materiaux[0,i]<-batiment.materiaux[0,i] -decay_building;
-					//write"test"+(note_ordre[6,i]+note_ordre[7,i]+note_ordre[8,i]+note_ordre[9,i]);
+					// On envoit une partie en stockage
 					centre_stock.materiaux[0,i]<-centre_stock.materiaux[0,i]+decay_building*(note_ordre[6,i]+note_ordre[7,i]+note_ordre[8,i]+note_ordre[9,i]);
 					centre_stock.capacite<-centre_stock.capacite-decay_building*(note_ordre[6,i]+note_ordre[7,i]+note_ordre[8,i]+note_ordre[9,i]);
 					
+					// Un autre partie en centre de tri
 					if(centre_trie.capacite>=(decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]))){
 						centre_trie.materiaux[0,i]<-centre_trie.materiaux[0,i]+decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]);
 						centre_trie.capacite<-centre_trie.capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]);
@@ -325,6 +321,7 @@ species people skills:[moving]{ // Unité opérative
 							}
 						}
 					}
+					// et le reste en valo
 					if(centre_val.capacite>=(decay_building*(note_ordre[3,i]+note_ordre[4,i]+note_ordre[5,i]))){
 						centre_val.materiaux[0,i]<-centre_val.materiaux[0,i]+decay_building*(note_ordre[3,i]+note_ordre[4,i]+note_ordre[5,i]);
 						centre_val.capacite<-centre_val.capacite-decay_building*(note_ordre[3,i]+note_ordre[4,i]+note_ordre[5,i]);
@@ -415,7 +412,7 @@ species people skills:[moving]{ // Unité opérative
 					myself.distance_stock[i]<-self distance_to myself;
 				}
 			}
-			loop i from:0 to:length(list_valo)-1{   // On calcule la distance entre l'agent et tous les centres de stockage existant
+			loop i from:0 to:length(list_valo)-1{   // On calcule la distance entre l'agent et tous les centres de valorisation existant
 				ask list_valo at i{
 					myself.distance_valo[i]<-self distance_to myself;
 				}
@@ -442,7 +439,7 @@ species people skills:[moving]{ // Unité opérative
 			tmp_dist<-copy(distance_valo);
 			tmp_centre<-copy(list_valo);
 			distance_valo<-distance_valo sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de tri par ordre croissant de distance
+			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de valorisation par ordre croissant de distance
 				loop j from:0 to: length(list_valo)-1{
 					if(distance_valo[i]=tmp_dist[j]){
 						list_valo[i]<-tmp_centre[j];
@@ -450,7 +447,7 @@ species people skills:[moving]{ // Unité opérative
 				}
 			}
 			centre_trie<-list_traitement[0]; // Le centre de tri principal de l'agent est celui le plus proche
-			centre_val<-list_valo[0];
+			centre_val<-list_valo[0]; // Le centre de valo principal de l'agent est celui le plus proche
 		}
 	}
 	
