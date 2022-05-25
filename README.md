@@ -21,3 +21,5 @@ Ce dossier nous donne les informations des bâtiments en France classés selon l
 
 # SIMULATION GAMA
 Une fois les différents documents du dossier "includes" téléchargés il faut les mettre dans GAMA. Une fois GAMA ouvert, il faut soit créer soit ouvrir votre projet GAMA dans "User models" (clique droit->new->GAMA projets). Une fois ce dossier créé vous avez 2 dossiers dedans: includes et models. Dans le dossier models il vous suffit d'importer le fichier .gaml et dans le dossier includes importer les différents fichiers (clique droit-> import->external files from disk). Avec ces différentes importations vous pouvez maintenant lancer la simulation.
+
+# RECONVERT_V1
