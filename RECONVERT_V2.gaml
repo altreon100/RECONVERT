@@ -47,7 +47,7 @@ global {
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
-			matrix_note[11,i]<-copy_between(matrix_note[2,i],0,length(matrix_note[0,i])-1);
+			matrix_note[11,i]<-copy_between(matrix_note[11,i],0,length(matrix_note[11,i])-1);
 		}
 		
 		point size<-point([1,matrix_ordre.rows]); // On ordonne le fichier par ordre de sorti
