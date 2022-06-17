@@ -12,19 +12,21 @@ global {
 	file shape_file_valo <- file("../includes/Centre de valorisation.shp"); //Fichier shape avec les centres de valorisation
 	file shape_file_reemploi <-file("../includes/Réemploi.shp");// Fichier shape avec les centres de réemploi
 	file shape_file_deconstruction<-file("../includes/Démolition.shp");// Fichier shape avec les entreprise de déconstruction
-	
 	file ordre_mat <- csv_file("../includes/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
+	
 	//Fichiers avec le pourcentage de sorti des matériaux en fonction de la note
 	file note0<-csv_file("../includes/002NOTE0.csv");
 	file note1<-csv_file("../includes/003NOTE1.csv");
 	file note2<-csv_file("../includes/004NOTE2.csv");
 	file note3<-csv_file("../includes/005NOTE3.csv");
 	file note4<-csv_file("../includes/006NOTE4.csv");
+	
 	file couts<-csv_file("../includes/007COUTS.csv"); // Fichier des coûts en fonction du centre et du matériaux choisi
-	file capacity<-csv_file("../includes/009CAPACITY.csv");
-	file remploi<-csv_file("../includes/011remploi.csv");
+	file capacity<-csv_file("../includes/009CAPACITY.csv");// Fichier des capacités des entreprises par matériaux par heure et par employé en fonction du code APE
+	file remploi<-csv_file("../includes/011remploi.csv"); // Fichier contenant la liste des entreprises classées "réemploi"
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
-	float step <- 0.5#day; //correspond au temps entre chaque cycle 
+	 
+	//Variables utilisées pour le monitoring
 	float total_capacite<-0.0;// Permet de calculer le taux d'occupation des centres de tri
 	float total_capacite2<-0.0; // Permet de calculer le taux d'occupation des centres de valo
 	float total_capacite3<-0.0; // Permet de calculer le taux d'occupation des centres de stockage
@@ -40,19 +42,23 @@ global {
 	int nb_tri<-0; //calcul le nombre de centre de tri
 	int nb_reemploi<-0;// calcul le nombre de centre de reemploi
 	int nb_deconstruction<-0;// calcul le nombre d'entreprise de déconstruction
+	
 	//Matrice résultante du classement des matériaux
 	matrix<float> note_ordre<-nil; 
 	matrix<float> cout_ordre<-nil;
 	matrix<string> capacite_ordre<-nil;
+	
 	//VARIABLE POUVANT ETRE MODIFIE
 	int nb_people<-1; // nombre d'unité opérative 
+	float step <- 0.5#day; //correspond au temps entre chaque cycle
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
 	float decay_tri<-2.0; //Règle le nombre de tonne éliminé par step dans les centres de tri
-	float decay_valo<-2.0;//Règle le nombre de tonne éliminé par step dans les centres de valorisation/réemploi
+	float decay_valo<-2.0;//Règle le nombre de tonne éliminé par step dans les centres de valorisation
 	float decay_building<-8.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
-	
+	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
 	init {
-		matrix<string> matrix_ordre <- matrix(ordre_mat); // On récupère le tableau de l'ordre de sorti et on enlève les "" propre aux fichiers CSV
+		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
+		matrix<string> matrix_ordre <- matrix(ordre_mat); 
 		
 		loop i from: 0 to: matrix_ordre.rows -1{
 			matrix_ordre[0,i]<-copy_between(matrix_ordre[0,i],1,length(matrix_ordre[0,i]));
@@ -61,7 +67,7 @@ global {
 		
 		
 		matrix<string> copy_mat<-copy(matrix_ordre);
-		matrix<string> matrix_note<-matrix(note4);// Idem ici il s'agit du tableau de note/ IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
+		matrix<string> matrix_note<-matrix(note4);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
@@ -82,6 +88,8 @@ global {
 			matrix_capacite[0,i]<-copy_between(matrix_capacite[0,i],1,length(matrix_capacite[0,i]));
 			matrix_capacite[39,i]<-copy_between(matrix_capacite[39,i],0,length(matrix_capacite[39,i])-1);
 		}
+		
+		
 		point size<-point([1,matrix_ordre.rows]); 
 		int nb<-0;
 		loop i from: 1 to: 8{// On ordonne le fichier par ordre de sorti
@@ -100,7 +108,7 @@ global {
 		capacite_ordre<-copy(matrix_capacite);
 		
 		
-		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages du tableau
+		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages du tableau et les capacités
 				loop j from:0 to:matrix_note.columns-1{
 					if(matrix_note[i,1]=matrix_ordre[1,j]){
 						loop k from:2 to: matrix_note.rows-2{
@@ -199,13 +207,13 @@ global {
 			nb_reemploi<-nb_reemploi+1;
 			info_acteur<-list_with(matrix_reemploi.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,"0");
-			loop i from:0 to:matrix_reemploi.columns-1{
+			loop i from:0 to:matrix_reemploi.columns-1{ // Pour chaque reemploi on récupère les infos de la matrice
 				info_acteur[i]<-matrix_reemploi[i,nb_reemploi-1];
 			}
 			id_acteur<-info_acteur[0];
 			nb_employe<-info_acteur[2];
 			code_APE<-info_acteur[3];
-			loop i from:0 to:capacite_ordre.rows-1{
+			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
 						info_capacite[j-2]<-capacite_ordre[j,i];
@@ -319,12 +327,12 @@ species building {
 	float mat_total<-0.0; // Calcul du total de matériaux restant 
 	float capacite; // Pour les centre de tri correspond à la capacité maximale du centre
 	matrix<float>  materiaux<-nil; // liste de tous les matériaux existant
-	list<string> info_acteur;
-	list<float>info_capacite;
+	list<string> info_acteur; // Liste contenant les informations de l'acteur (code APE,ID,matériaux traités,...)
+	list<float>info_capacite;// Liste contenant les capacités de l'acteur pour chaque matériaux
 	int id_building; // id du batiment
-	int id_acteur;
-	int nb_employe;
-	string code_APE<-nil;
+	int id_acteur; // Correspond à l'ID de l'acteur donné dans les fichiers CSV
+	int nb_employe; // Correspond aux nombres d'employés salariés de l'acteur
+	string code_APE<-nil; // Correspond au Code APE de l'acteur
 	
 	
 	reflex tot{ // calcul le total de matériaux restant 
@@ -444,11 +452,11 @@ species reemploi parent:building {
 	rgb color<-#pink;
 	reflex decay {
 		loop i from:0 to:materiaux.rows-1{
-			if(materiaux[0,i]>info_capacite[i] and nb_employe!=0){
+			if(materiaux[0,i]>info_capacite[i]*nb_heure and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				materiaux[0,i]<-materiaux[0,i]-info_capacite[i];
+				materiaux[0,i]<-materiaux[0,i]-info_capacite[i]*nb_heure;
 				capacite<-capacite+info_capacite[i];
-				total_capacite2<-total_capacite2+info_capacite[i];
+				total_capacite2<-total_capacite2+info_capacite[i]*nb_heure;
 			}
 			else if(materiaux[0,i]>0.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
@@ -530,7 +538,6 @@ species people skills:[moving]{ // Unité opérative
 					}
 					// Ensuite les centres de réemploi
 					if(centre_reemploi.capacite>=(decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i])) and centre_reemploi.info_acteur[i+8]="1"){
-						write"ok "+ decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						centre_reemploi.materiaux[0,i]<-centre_reemploi.materiaux[0,i]+decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						centre_reemploi.capacite<-centre_reemploi.capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -538,7 +545,6 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
 							if(list_reemploi[j].capacite>=decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_acteur[i+8]="1" and find_new_centre=false){
-								write"proche"+list_reemploi[j].id_acteur;
 								list_reemploi[j].materiaux[0,i]<-list_reemploi[j].materiaux[0,i]+decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -590,7 +596,6 @@ species people skills:[moving]{ // Unité opérative
 					}
 					
 					if(centre_reemploi.capacite>=(batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]))and centre_reemploi.info_acteur[i+8]="1"){
-						write"ok mat< "+batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						centre_reemploi.materiaux[0,i]<-centre_reemploi.materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						centre_reemploi.capacite<-centre_reemploi.capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -598,7 +603,6 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
 							if(list_reemploi[j].capacite>=batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_acteur[i+8]="1" and find_new_centre=false){
-								write"proche mat<"+list_reemploi[j].id_acteur;
 								list_reemploi[j].materiaux[0,i]<-list_reemploi[j].materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
