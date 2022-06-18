@@ -1,4 +1,4 @@
-COUTS
+COUT
 "DI,Melanges bitumineux ,-10.0,-1.0,-75.0,0.5"
 "DI,Terres  non polluees ,-1.8,-1.0,-75.0,0.5"
 "DI,Beton et pierre ,-0.7,-1.0,-75.0,0.5"
@@ -22,12 +22,12 @@ COUTS
 "DND,Revetements de sols ,-70.0,-1.0,-75.0,150.0"
 "DND,DEEE non dangereux,-70.0,-1.0,-75.0,150.0"
 "DND,Melanges de DND listes cidessus ,-15.0,-1.0,-75.0,0.0"
-"DND,Vegetaux ,9.5,-1.0,-75.0,25.0"
-"DND,Terre vegetale ,9.5,-1.0,-75.0,25.0"
+"DND,Vegetaux ,-9.5,-1.0,-75.0,25.0"
+"DND,Terre vegetale ,-9.5,-1.0,-75.0,25.0"
 "DND,Autres DND,-15.0,-1.0,-75.0,0.0"
-"DD,Amiante lie a des materiaux inertes ,-1500.0,0.0,-200.0,0.0"
-"DD,Autres types d'amiante lie,-1500.0,0.0,-200.0,0.0"
-"DD,Amiante friable ,-1500.0,0.0,-200.0,0.0"
+"DD,Amiante lie a des materiaux inertes ,-1500.0,0.0,-500.0,0.0"
+"DD,Autres types d'amiante lie,-1500.0,0.0,-700.0,0.0"
+"DD,Amiante friable ,-1500.0,0.0,-700.0,0.0"
 "DD,Melanges bitumineux contenant du goudron ,-1500.0,0.0,-200.0,0.0"
 "DD,Complexe d'etancheite contenant du goudron ,-1500.0,0.0,-200.0,0.0"
 "DD,Peintures contenant des  substances dangereuses ,-1500.0,0.0,-200.0,0.0"
