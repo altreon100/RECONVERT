@@ -14,6 +14,9 @@ Pour plus de détail sur:
 # PRISE EN MAIN DE LA SOLUTION RECONVERT
 
 
+Le projet Reconvert s'inscrit dans une démarche de recyclage des matériaux lors de la déconstruction des bâtiments. Le but serait de faire une déconstruction sélective des bâtiments et d'organiser des flux de produits et matériaux qui en sont issus pour un recyclage à une échelle locale. Le projet se positionne sur la métropole européenne de Lille (MEL) dans le cadre d'un partenariat entre cette dernière, les chercheurs de l'école IMT Nord Europe et d'acteurs du BTP (Rabot Dutilleul).
+
+
 
 
 
