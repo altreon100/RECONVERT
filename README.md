@@ -21,7 +21,7 @@ Dans un premier temps il vous faut installer Gama-Platform, ensuite vous pouvez 
 - Lancer Gama-Platfom
     * au premier lancement Gama vous demande de selectionné un repertoire de travaille. Créer / selectionné un repertoire à votre convenance sur votre machine.
 - Pour tester la solution, vous pouvez vous référer aux [tutoriels](https://gama-platform.org/wiki/Tutorials).
-
+-Pour lancer la simulation il suffit de cloner le projet dans le repertoire créé et de l'importer dans GAMA (User models -> import->GAMA project).
 
 ## Projet RECONVERT
 
