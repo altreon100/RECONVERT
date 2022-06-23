@@ -4,7 +4,7 @@
 model RECONVERTV3
 
 global {
-	file shape_file_buildings <- file("../includes/Permis de démolir_2020-2021.shp"); // Fichier shape contenant les bâtiments à déconstruire
+	file shape_file_buildings <- file("../includes/permis de démolir.shp"); // Fichier shape contenant les bâtiments à déconstruire
 	file shape_file_bounds <- file("../includes/Contiurs simple MEL.shp"); //Fichier shape du périmètre de la zone choisi
 	file shape_file_tri <- file("../includes/Centre de tri.shp"); //Fichier shape avec les centres de tri
 	file shape_file_enfouissement <- file("../includes/Enfouissement.shp"); //Fichier shape avec les zones d'enfouissement
@@ -23,6 +23,7 @@ global {
 	
 	file couts<-csv_file("../includes/007COUTS.csv"); // Fichier des coûts en fonction du centre et du matériaux choisi
 	file capacity<-csv_file("../includes/009CAPACITY.csv");// Fichier des capacités des entreprises par matériaux par heure et par employé en fonction du code APE
+	file tissus<-csv_file("../includes/010tissus.csv"); // Fichier contenant la liste des  quantités de matériaux en fonction du tissus
 	file remploi<-csv_file("../includes/011remploi.csv"); // Fichier contenant la liste des entreprises classées "réemploi"
 	file csv_tri<-csv_file("../includes/012tri.csv"); //Fichier contenant la liste des entreprises classées "centre de tri"
 	file csv_enfouissement<-csv_file("../includes/013enfouissement.csv"); //Fichier contenant la liste des entreprises classées "enfouissement"
@@ -52,12 +53,12 @@ global {
 	matrix<float> note_ordre<-nil; 
 	matrix<float> cout_ordre<-nil;
 	matrix<string> capacite_ordre<-nil;
-	
+	matrix<float> tissus_ordre<-nil;
 	//VARIABLE POUVANT ETRE MODIFIE
 	int nb_people<-1; // nombre d'unité opérative 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
-	float decay_building<-2.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
+	float decay_building<-0.02; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
 	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
 	init {
 		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
@@ -83,6 +84,19 @@ global {
 			matrix_cout[0,i]<-copy_between(matrix_cout[0,i],1,length(matrix_cout[0,i]));
 			matrix_cout[5,i]<-copy_between(matrix_cout[5,i],0,length(matrix_cout[5,i])-1);
 		}
+		
+		matrix<string> matrix_tissus<-matrix(tissus);
+		
+		loop i from: 0 to: matrix_tissus.rows -1{
+			matrix_tissus[0,i]<-copy_between(matrix_tissus[0,i],1,length(matrix_tissus[0,i]));
+			matrix_tissus[11,i]<-copy_between(matrix_tissus[11,i],0,length(matrix_tissus[11,i])-1);
+		}
+		
+		/*loop i from: 0 to: matrix_tissus.rows - 1 {
+			loop j from: 0 to: matrix_tissus.columns - 1 {
+				write "The element at row: " +i + " and column: " + j + " of the matrix is: " + matrix_tissus[j,i];				
+			}
+		}*/
 		
 		matrix<string> matrix_reemploi<-matrix(remploi);
 		matrix<string>matrix_tri<-matrix(csv_tri);
@@ -129,8 +143,9 @@ global {
 		point size2<-point([matrix_note.columns,matrix_note.rows-2]);
 		note_ordre<-matrix_with(size2,0.0);
 		capacite_ordre<-copy(matrix_capacite);
-		
-		
+		matrix_tissus<-transpose(matrix_tissus);
+		tissus_ordre<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-2),0.0);
+
 		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages du tableau et les capacités
 				loop j from:0 to:matrix_note.columns-1{
 					if(matrix_note[i,1]=matrix_ordre[1,j]){
@@ -143,11 +158,17 @@ global {
 							capacite_ordre[j+2,l]<-matrix_capacite[i+2,l];
 							
 						}
+						loop m from:0 to: matrix_tissus.rows-1{
+							
+							tissus_ordre[j,m-2]<-float(matrix_tissus[i,m]);
+							
+						}
 					}	
 				}
 		
 		}
 		note_ordre<-transpose(note_ordre);
+		tissus_ordre<-transpose(tissus_ordre);
 		
 		matrix_cout<-transpose(matrix_cout);
 		point size3<-[matrix_cout.columns,4];
@@ -304,20 +325,21 @@ global {
 			nb_deconstruction<-nb_deconstruction+1;
 			
 		}
-		create deconstruction  from:shape_file_buildings{ // création des bâtiments à déconstruire
+		create deconstruction  from:shape_file_buildings with:[surface::float(read("Surfaces"))]{ // création des bâtiments à déconstruire
 			id_building<-id+1;
 			id<-id+1;
 			nb_building<-nb_building+1;
 			nb_contrat<-nb_contrat+1;
 			materiaux<-matrix_with(size,0.0);
 				loop i from:0 to:materiaux.rows-1{ // On affecte pour chaque matériaux et pour chaque bâtiment un nombre de tonne entre 0 et 30
-					materiaux[0,i]<-rnd(30.0);
+					materiaux[0,i]<-surface*tissus_ordre[9,i];
 					mat_total<-mat_total+materiaux[0,i];
 				}
 		}
 		
 		create people number: nb_people { // creation des unités opératives
 			batiment<-one_of(deconstruction);
+			//batiment<-deconstruction[15];
 			location <- any_location_in (batiment); // on affecte à l'agent une localisation aléatoire en choississant 1 bâtiment de la liste
 			nb_contrat<-nb_contrat-1;
 			id_person<-batiment.id_building;
@@ -588,6 +610,7 @@ species entreprise_deconstruction parent:building {
 	people ouvrier;
 }
 species deconstruction parent:building { 
+	float surface;
 	bool deconstruction<-false; // Si le bâtiment est en cours de déconstruction
 	rgb color<-#blue;
 }
