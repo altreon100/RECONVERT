@@ -1,10 +1,5 @@
 .built_in_models_1655732033115
 .gama_application_workspace
 .metadata/
-gama-project/includes/Bati_Tissu_MEL_Union.cpg
-	gama-project/includes/Bati_Tissu_MEL_Union.dbf
-	gama-project/includes/Bati_Tissu_MEL_Union.prj
-	gama-project/includes/Bati_Tissu_MEL_Union.qix
-	gama-project/includes/Bati_Tissu_MEL_Union.qpj
-	gama-project/includes/Bati_Tissu_MEL_Union.shp
-	gama-project/includes/Bati_Tissu_MEL_Union.shx
+.gama-project/includes/Bati_Tissu_MEL_Union.*
+	
