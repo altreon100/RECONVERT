@@ -54,6 +54,10 @@ global {
 	matrix<float> cout_ordre<-nil;
 	matrix<string> capacite_ordre<-nil;
 	matrix<float> tissus_ordre<-nil;
+	matrix<string> enfouissement_ordre<-nil;
+	matrix<string> valorisation_ordre<-nil;
+	matrix<string> reemploi_ordre<-nil;
+	matrix<string> tri_ordre<-nil;
 	//VARIABLE POUVANT ETRE MODIFIE
 	int nb_people<-1; // nombre d'unité opérative 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
@@ -143,6 +147,10 @@ global {
 		point size2<-point([matrix_note.columns,matrix_note.rows-2]);
 		note_ordre<-matrix_with(size2,0.0);
 		capacite_ordre<-copy(matrix_capacite);
+		enfouissement_ordre<-copy(matrix_enfouissement);
+		valorisation_ordre<-copy(matrix_valorisation);
+		reemploi_ordre<-copy(matrix_reemploi);
+		tri_ordre<-copy(matrix_tri);
 		matrix_tissus<-transpose(matrix_tissus);
 		tissus_ordre<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-2),0.0);
 
@@ -161,6 +169,26 @@ global {
 						loop m from:0 to: matrix_tissus.rows-1{
 							
 							tissus_ordre[j,m-2]<-float(matrix_tissus[i,m]);
+							
+						}
+						loop n from:0 to: matrix_enfouissement.rows-1{
+							
+							enfouissement_ordre[j+8,n]<-matrix_enfouissement[i+8,n];
+							
+						}
+						loop o from:0 to: matrix_valorisation.rows-1{
+							
+							valorisation_ordre[j+8,o]<-matrix_valorisation[i+8,o];
+							
+						}
+						loop p from:0 to: matrix_reemploi.rows-1{
+							
+							reemploi_ordre[j+8,p]<-matrix_reemploi[i+8,p];
+							
+						}
+						loop q from:0 to: matrix_tri.rows-1{
+							
+							tri_ordre[j+8,q]<-matrix_tri[i+8,q];
 							
 						}
 					}	
@@ -198,8 +226,8 @@ global {
 					materiaux<-matrix_with(size,0.0);
 					info_acteur<-list_with(matrix_enfouissement.columns,"0");
 					info_capacite<-list_with(capacite_ordre.columns-2,"0");
-					loop i from:0 to:matrix_enfouissement.columns-1{ // Pour chaque centre d'enfouissement on récupère les infos de la matrice
-				info_acteur[i]<-matrix_enfouissement[i,nb_stockage-1];
+					loop i from:0 to:enfouissement_ordre.columns-1{ // Pour chaque centre d'enfouissement on récupère les infos de la matrice
+				info_acteur[i]<-enfouissement_ordre[i,nb_stockage-1];
 			}
 			id_acteur<-info_acteur[0];
 			nb_employe<-info_acteur[2];
@@ -221,8 +249,8 @@ global {
 				materiaux<-matrix_with(size,0.0);
 			info_acteur<-list_with(matrix_valorisation.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,"0");
-			loop i from:0 to:matrix_valorisation.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
-				info_acteur[i]<-matrix_valorisation[i,nb_valo-1];
+			loop i from:0 to:valorisation_ordre.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
+				info_acteur[i]<-valorisation_ordre[i,nb_valo-1];
 			}
 			id_acteur<-info_acteur[0];
 			nb_employe<-info_acteur[2];
@@ -282,8 +310,8 @@ global {
 			centre_enfouissement<-list_enfouissement[0];
 			info_acteur<-list_with(matrix_tri.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,"0");
-			loop i from:0 to:matrix_tri.columns-1{ // Pour chaque centre de tri on récupère les infos de la matrice
-				info_acteur[i]<-matrix_tri[i,nb_tri-1];
+			loop i from:0 to:tri_ordre.columns-1{ // Pour chaque centre de tri on récupère les infos de la matrice
+				info_acteur[i]<-tri_ordre[i,nb_tri-1];
 			}
 			id_acteur<-info_acteur[0];
 			nb_employe<-info_acteur[2];
@@ -305,8 +333,8 @@ global {
 			nb_reemploi<-nb_reemploi+1;
 			info_acteur<-list_with(matrix_reemploi.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,"0");
-			loop i from:0 to:matrix_reemploi.columns-1{ // Pour chaque reemploi on récupère les infos de la matrice
-				info_acteur[i]<-matrix_reemploi[i,nb_reemploi-1];
+			loop i from:0 to:reemploi_ordre.columns-1{ // Pour chaque reemploi on récupère les infos de la matrice
+				info_acteur[i]<-reemploi_ordre[i,nb_reemploi-1];
 			}
 			id_acteur<-info_acteur[0];
 			nb_employe<-info_acteur[2];
@@ -338,8 +366,8 @@ global {
 		}
 		
 		create people number: nb_people { // creation des unités opératives
-			batiment<-one_of(deconstruction);
-			//batiment<-deconstruction[15];
+			//batiment<-one_of(deconstruction);
+			batiment<-deconstruction[15];
 			location <- any_location_in (batiment); // on affecte à l'agent une localisation aléatoire en choississant 1 bâtiment de la liste
 			nb_contrat<-nb_contrat-1;
 			id_person<-batiment.id_building;
@@ -709,7 +737,7 @@ species people skills:[moving]{ // Unité opérative
 						}
 					}
 					// et le reste en valorisation
-					if(centre_val.capacite>=(decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))){
+					if(centre_val.capacite>=(decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))and centre_val.info_acteur[i+8]="1"){
 						centre_val.materiaux[0,i]<-centre_val.materiaux[0,i]+decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						centre_val.capacite<-centre_val.capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -717,7 +745,7 @@ species people skills:[moving]{ // Unité opérative
 					}
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de valo le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
-							if(list_valo[j].capacite>=decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and find_new_centre_valo=false){
+							if(list_valo[j].capacite>=decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
 								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								list_valo[j].capacite<-list_valo[j].capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -782,7 +810,7 @@ species people skills:[moving]{ // Unité opérative
 						}
 					}
 					
-					if(centre_val.capacite>=(batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))){
+					if(centre_val.capacite>=(batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))and centre_val.info_acteur[i+8]="1"){
 						centre_val.materiaux[0,i]<-centre_val.materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						centre_val.capacite<-centre_val.capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -790,7 +818,7 @@ species people skills:[moving]{ // Unité opérative
 					}
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
-							if(list_valo[j].capacite>=batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and find_new_centre_valo=false){
+							if(list_valo[j].capacite>=batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
 								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								list_valo[j].capacite<-list_valo[j].capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
