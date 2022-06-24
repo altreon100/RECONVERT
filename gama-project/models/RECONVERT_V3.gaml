@@ -11,7 +11,7 @@ global {
 	file shape_file_valo <- file("../includes/Centre de valorisation.shp"); //Fichier shape avec les centres de valorisation
 	file shape_file_reemploi <-file("../includes/Réemploi.shp");// Fichier shape avec les centres de réemploi
 	file shape_file_deconstruction<-file("../includes/Démolition.shp");// Fichier shape avec les entreprise de déconstruction
-	file shape_file_lille<-file("../includes/Bati_Tissu_MEL_Union.shp");// Fichier shape avec la carte de la MEL
+	file shape_file_MEL<-file("../includes/Bati_Tissu_MEL_Union.shp");// Fichier shape avec la carte de la MEL
 	file ordre_mat <- csv_file("../includes/001ORDER.csv");// Fichier contenant l'ordre de sortie des matériaux
 	
 	//Fichiers avec le pourcentage de sorti des matériaux en fonction de la note
@@ -28,6 +28,7 @@ global {
 	file csv_tri<-csv_file("../includes/012tri.csv"); //Fichier contenant la liste des entreprises classées "centre de tri"
 	file csv_enfouissement<-csv_file("../includes/013enfouissement.csv"); //Fichier contenant la liste des entreprises classées "enfouissement"
 	file csv_valorisation<-csv_file("../includes/014valorisation.csv"); //Fichier contenant la liste des entreprises classées "valorisation"
+	file couts_env<-csv_file("../includes/017ENV2.csv"); // Fichier des coûts environnementaux en fonction  du matériaux choisi
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
 	 
 	//Variables utilisées pour le monitoring
@@ -40,6 +41,9 @@ global {
 	float init_tot_capacite3<-0.0;
 	float init_tot_capacite4<-0.0;
 	float som_cout<-0.0; // Calcul le coûts en € de la déconstruction des bâtiments
+	float som_env_eau<-0.0; // Calcul le coûts en eau  de la déconstruction des bâtiments 
+	float som_env_co2<-0.0; // Calcul le coûts en CO2  de la déconstruction des bâtiments 
+	float som_env_energie<-0.0; // Calcul le coûts en energie  de la déconstruction des bâtiments 
 	int id<-0; //l'id de tout les bâtiment
 	int nb_building<-0; // calcul en temps réel le nombre de bâtiment qui reste à déconstruire 
 	int nb_contrat<-0; // calcul en temps réel le nombre de contrat qui reste  
@@ -52,6 +56,7 @@ global {
 	//Matrice résultante du classement des matériaux
 	matrix<float> note_ordre<-nil; 
 	matrix<float> cout_ordre<-nil;
+	matrix<float> env_ordre<-nil;
 	matrix<string> capacite_ordre<-nil;
 	matrix<float> tissus_ordre<-nil;
 	matrix<string> enfouissement_ordre<-nil;
@@ -62,7 +67,7 @@ global {
 	int nb_people<-1; // nombre d'unité opérative 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
-	float decay_building<-0.02; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
+	float decay_building<-5.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
 	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
 	init {
 		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
@@ -75,7 +80,7 @@ global {
 		
 		
 		matrix<string> copy_mat<-copy(matrix_ordre);
-		matrix<string> matrix_note<-matrix(note4);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
+		matrix<string> matrix_note<-matrix(note1);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
@@ -89,18 +94,24 @@ global {
 			matrix_cout[5,i]<-copy_between(matrix_cout[5,i],0,length(matrix_cout[5,i])-1);
 		}
 		
+		matrix<string> matrix_env<-matrix(couts_env);
+		
+		
+		loop i from: 0 to: matrix_env.rows -1{
+			matrix_env[0,i]<-copy_between(matrix_env[0,i],1,length(matrix_env[0,i]));
+			matrix_env[4,i]<-copy_between(matrix_env[4,i],0,length(matrix_env[4,i])-1);
+		}
+		/*loop i from: 0 to: matrix_env.rows - 1 {
+			loop j from: 0 to: matrix_env.columns - 1 {
+				write "The element at row: " +i + " and column: " + j + " of the matrix is: " + matrix_env[j,i];				
+			}
+		}*/
 		matrix<string> matrix_tissus<-matrix(tissus);
 		
 		loop i from: 0 to: matrix_tissus.rows -1{
 			matrix_tissus[0,i]<-copy_between(matrix_tissus[0,i],1,length(matrix_tissus[0,i]));
 			matrix_tissus[11,i]<-copy_between(matrix_tissus[11,i],0,length(matrix_tissus[11,i])-1);
 		}
-		
-		/*loop i from: 0 to: matrix_tissus.rows - 1 {
-			loop j from: 0 to: matrix_tissus.columns - 1 {
-				write "The element at row: " +i + " and column: " + j + " of the matrix is: " + matrix_tissus[j,i];				
-			}
-		}*/
 		
 		matrix<string> matrix_reemploi<-matrix(remploi);
 		matrix<string>matrix_tri<-matrix(csv_tri);
@@ -201,25 +212,30 @@ global {
 		matrix_cout<-transpose(matrix_cout);
 		point size3<-[matrix_cout.columns,4];
 		cout_ordre<-matrix_with(size3,0.0);
-		
+		matrix_env<-transpose(matrix_env);
+		env_ordre<-matrix_with(point([matrix_env.columns,3]),0.0);
 		loop i from: 0 to: matrix_cout.columns-1{ // Idem pour le tableau des coûts
 				loop j from:0 to:matrix_cout.columns-1{
 					if(matrix_cout[i,1]=matrix_ordre[1,j]){
 						loop k from:2 to: matrix_cout.rows-1{
 							cout_ordre[j,k-2]<-float(matrix_cout[i,k]);
 						}
+						loop l from:2 to: matrix_env.rows-1{
+							env_ordre[j,l-2]<-float(matrix_env[i,l]);
+						}
 					}	
 				}
 				
 		}
 		cout_ordre<-transpose(cout_ordre);
+		env_ordre<-transpose(env_ordre);
 		
 		
-		/*create building from:shape_file_lille{
+		create building from:shape_file_MEL{
 			
-		}*/
+		}
 		create enfouissement from:shape_file_enfouissement{ // creation des centres de stockages avec une forte capacité
-					capacite<-1000.0;	
+					capacite<-3000.0;	
 					total_capacite3<-total_capacite3+capacite;
 					init_tot_capacite3<-init_tot_capacite3+capacite;
 					nb_stockage<-nb_stockage+1;
@@ -266,7 +282,7 @@ global {
 		}
 		
 		create tri from:shape_file_tri{ // creation des centres de tri
-			capacite<-40.0;
+			capacite<-400.0;
 			total_capacite<-total_capacite+capacite;
 			init_tot_capacite<-init_tot_capacite+capacite;
 				nb_tri<-nb_tri+1;
@@ -366,8 +382,7 @@ global {
 		}
 		
 		create people number: nb_people { // creation des unités opératives
-			//batiment<-one_of(deconstruction);
-			batiment<-deconstruction[15];
+			batiment<-one_of(deconstruction);
 			location <- any_location_in (batiment); // on affecte à l'agent une localisation aléatoire en choississant 1 bâtiment de la liste
 			nb_contrat<-nb_contrat-1;
 			id_person<-batiment.id_building;
@@ -511,6 +526,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 					total_capacite3<-total_capacite3-pourcentage_tri*info_capacite[i]*nb_heure;
 					som_cout<-som_cout+cout_ordre[2,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+					som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+					som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+					som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*info_capacite[i]*nb_heure;
 					}
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
@@ -519,6 +537,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 								total_capacite<-total_capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 								som_cout<-som_cout+cout_ordre[0,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+								som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+								som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*info_capacite[i]*nb_heure;
+								som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*info_capacite[i]*nb_heure;
 								find_new_enfouissement<-true;
 							}
 						}
@@ -529,6 +550,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					centre_val.capacite<-centre_val.capacite-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 					total_capacite2<-total_capacite2-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 					som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+					som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+					som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+					som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 				}
 				else{ 
 						loop j from:0 to:length(list_valo)-1{
@@ -537,6 +561,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								list_valo[j].capacite<-list_valo[j].capacite-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 								total_capacite2<-total_capacite2-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 								som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+								som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+								som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+								som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 								find_new_centre_valo<-true;
 							}
 						}
@@ -552,6 +579,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*materiaux[0,i];
 					total_capacite3<-total_capacite3-pourcentage_tri*materiaux[0,i];
 					som_cout<-som_cout+cout_ordre[2,i]*pourcentage_tri*materiaux[0,i];
+					som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*materiaux[0,i];
+					som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*materiaux[0,i];
+					som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*materiaux[0,i];
 					}
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
@@ -560,6 +590,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*materiaux[0,i];
 								total_capacite<-total_capacite-pourcentage_tri*materiaux[0,i];
 								som_cout<-som_cout+cout_ordre[0,i]*pourcentage_tri*materiaux[0,i];
+								som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*materiaux[0,i];
+								som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*materiaux[0,i];
+								som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*materiaux[0,i];
 								find_new_enfouissement<-true;
 							}
 						}
@@ -569,6 +602,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					centre_val.capacite<-centre_val.capacite-(1-pourcentage_tri)*materiaux[0,i];
 					total_capacite2<-total_capacite2-(1-pourcentage_tri)*materiaux[0,i];
 					som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*materiaux[0,i];
+					som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*materiaux[0,i];
+					som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*materiaux[0,i];
+					som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*materiaux[0,i];
 				}
 				else{ 
 						loop j from:0 to:length(list_valo)-1{
@@ -577,6 +613,9 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								list_valo[j].capacite<-list_valo[j].capacite-(1-pourcentage_tri)*materiaux[0,i];
 								total_capacite2<-total_capacite2-(1-pourcentage_tri)*materiaux[0,i];
 								som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*materiaux[0,i];
+								som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*materiaux[0,i];
+								som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*materiaux[0,i];
+								som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*materiaux[0,i];
 								find_new_centre_valo<-true;
 							}
 						}
@@ -688,6 +727,9 @@ species people skills:[moving]{ // Unité opérative
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					total_capacite3<-total_capacite3-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					som_cout<-som_cout+cout_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_eau<-som_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_energie<-som_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_co2<-som_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					}
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
@@ -696,6 +738,9 @@ species people skills:[moving]{ // Unité opérative
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								total_capacite<-total_capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								som_cout<-som_cout+cout_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_eau<-som_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_energie<-som_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_co2<-som_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								find_new_enfouissement<-true;
 							}
 						}
@@ -724,6 +769,9 @@ species people skills:[moving]{ // Unité opérative
 						centre_reemploi.capacite<-centre_reemploi.capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 					}
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
@@ -732,6 +780,9 @@ species people skills:[moving]{ // Unité opérative
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								find_new_reemploi<-true;
 							}
 						}
@@ -742,6 +793,9 @@ species people skills:[moving]{ // Unité opérative
 						centre_val.capacite<-centre_val.capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 					}
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de valo le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
@@ -750,6 +804,9 @@ species people skills:[moving]{ // Unité opérative
 								list_valo[j].capacite<-list_valo[j].capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								find_new_centre_valo<-true;
 							}
 						}
@@ -761,6 +818,9 @@ species people skills:[moving]{ // Unité opérative
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					total_capacite3<-total_capacite3-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					som_cout<-som_cout+cout_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_eau<-som_env_eau-env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_energie<-som_env_energie-env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					som_env_co2<-som_env_co2-env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					}
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
@@ -769,6 +829,9 @@ species people skills:[moving]{ // Unité opérative
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								total_capacite<-total_capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								som_cout<-som_cout+cout_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_eau<-som_env_eau-env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_energie<-som_env_energie-env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_co2<-som_env_co2-env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								find_new_enfouissement<-true;
 							}
 						}
@@ -797,6 +860,9 @@ species people skills:[moving]{ // Unité opérative
 						centre_reemploi.capacite<-centre_reemploi.capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						total_capacite4<-total_capacite4-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 					}
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
@@ -805,6 +871,9 @@ species people skills:[moving]{ // Unité opérative
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								total_capacite4<-total_capacite4-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								find_new_reemploi<-true;
 							}
 						}
@@ -815,6 +884,9 @@ species people skills:[moving]{ // Unité opérative
 						centre_val.capacite<-centre_val.capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						som_cout<-som_cout+cout_ordre[3,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 					}
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
@@ -823,6 +895,9 @@ species people skills:[moving]{ // Unité opérative
 								list_valo[j].capacite<-list_valo[j].capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								som_cout<-som_cout+cout_ordre[3,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								find_new_centre_valo<-true;
 							}
 						}
@@ -844,9 +919,7 @@ species people skills:[moving]{ // Unité opérative
 	}
 	reflex change when:nb_contrat!=0 and batiment.color=#black { // Quand le bâtiment est déconstruit on reprend un nouveau bâtiment dans la liste
 		list_bat<-list(deconstruction);
-		write"change";
 		if(list_bat!=nil){
-			write"nil";
 			batiment<-one_of(list_bat);
 			the_target<-any_location_in(batiment);
 			nb_contrat<-nb_contrat-1;
@@ -857,9 +930,7 @@ species people skills:[moving]{ // Unité opérative
 	
 	reflex move when: the_target !=nil{ // permet le déplacement de l'agent vers le nouveau bâtiment
 		do goto target:the_target ;
-		write"goto";
 		if the_target=location{
-			write"target";
 			the_target<-nil;
 			loop i from:0 to:length(list_traitement)-1{   // On calcule la distance entre l'agent et tous les centres de tri existant
 				ask list_traitement at i{
@@ -936,9 +1007,9 @@ species people skills:[moving]{ // Unité opérative
 	}
 }
 
-experiment road_traffic type: gui {
+experiment RECONVERT type: gui {
 	output {
-		display city_display type:opengl {
+		display VISUEL type:opengl {
 			species tri aspect: base ;
 			species enfouissement aspect: base ;
 			species valorisation aspect: base ;
@@ -949,7 +1020,7 @@ experiment road_traffic type: gui {
 			//species building aspect:base;
 		}
 		
-		display information refresh:every(5#cycles){
+		display OCCUPATION refresh:every(5#cycles){
 			chart "Taux d'occupation des centres  (en %)" type:series size:{1,0.5} position:{0,0}{
 				data "tri" value:(1-(total_capacite/init_tot_capacite))*100 color:#red;
 				data "valo" value:(1-(total_capacite2/init_tot_capacite2))*100 color:#blue;
@@ -958,7 +1029,14 @@ experiment road_traffic type: gui {
 			}
 		}
 		
-		
+		display GAINS refresh:every(5#cycles){
+			chart "GAINS pour différents critères" type:series size:{1,0.5} position:{0,0}{
+				data "Gain en €" value:som_cout color:#red;
+				data "Gain en eau(m³/t)" value:som_env_eau color:#blue;
+				data "Gain en energie(MJ/t)" value:som_env_energie color:#green;
+				data "Gain en CO2(t CO2 eq/t)" value:som_env_co2 color:#yellow;
+			}
+		}
 		
 		monitor "Number of building" value: nb_building;
 		monitor "Number of tri" value: nb_tri;
@@ -966,8 +1044,5 @@ experiment road_traffic type: gui {
 		monitor "Number of reemploi" value: nb_reemploi;
 		monitor "Number of entreprise deconstruction" value: nb_deconstruction;
 		monitor "Number of valo" value: nb_valo;
-		monitor "tot capacite" value: total_capacite;
-		monitor "ini tot capacite" value: init_tot_capacite;
-		monitor "cout total" value:som_cout;
 	}
 }
