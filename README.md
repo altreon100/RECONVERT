@@ -41,8 +41,8 @@ Dans un second temps: pour lancer la simulation il faut:
     * Télécharger les fichiers [Bati_Tissu_MEL_Union](https://partage.imt.fr/index.php/apps/files?dir=/Shared/SIMU_RECONVERT/New%20donn%C3%A9es%20SIG&fileid=539656037)
     * Ajouter les dans le dossier "includes" du projet
 - Ya plus qu'a lancer la simulation:
-    * Selectionner `RECONVERT`, `models` et `RECONVERT_v3` dans le menu des modèles
-    * Puis sur `road_traffic` et enfin sur `play` (stopper la simulation permet de revenir aux sources)
+    * Selectionner `RECONVERT`, `models` et `RECONVERT_V3.gaml` dans le menu des modèles
+    * Puis sur `RECONVERT` et enfin sur `play` (stopper la simulation permet de revenir aux sources)
 
 
 ## SIMULATION DE RECONVERT
@@ -75,6 +75,17 @@ Enfin un pourcentage de chaque matériaux déconstruit est envoyé à chaque cen
 
 ### RECONVERT_V3
 
+
+## PRENDRE LA MAIN
+
+
+### CHANGER LE PLAN DES OPERATIV-UNIT
+
+
+### CHANGER LES NOTES DES CHANTIERS
+
+
+### PASSER SUR UN NOUVEAU TERRITOIRE
 
 
 ## AUTEURS
