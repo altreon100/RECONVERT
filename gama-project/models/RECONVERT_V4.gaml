@@ -1,7 +1,7 @@
 
 
 
-model RECONVERTV3
+model RECONVERTV4
 
 global {
 	file shape_file_buildings <- file("../includes/permis de démolir.shp"); // Fichier shape contenant les bâtiments à déconstruire
@@ -20,6 +20,7 @@ global {
 	file note2<-csv_file("../includes/004NOTE2.csv");
 	file note3<-csv_file("../includes/005NOTE3.csv");
 	file note4<-csv_file("../includes/006NOTE4.csv");
+	file csv_note<-nil;
 	
 	file couts<-csv_file("../includes/007COUTS.csv"); // Fichier des coûts en fonction du centre et du matériaux choisi
 	file capacity<-csv_file("../includes/009CAPACITY.csv");// Fichier des capacités des entreprises par matériaux par heure et par employé en fonction du code APE
@@ -28,9 +29,10 @@ global {
 	file csv_tri<-csv_file("../includes/012tri.csv"); //Fichier contenant la liste des entreprises classées "centre de tri"
 	file csv_enfouissement<-csv_file("../includes/013enfouissement.csv"); //Fichier contenant la liste des entreprises classées "enfouissement"
 	file csv_valorisation<-csv_file("../includes/014valorisation.csv"); //Fichier contenant la liste des entreprises classées "valorisation"
+	file csv_demolition<-csv_file("../includes/015demolition.csv"); //Fichier contenant la liste des entreprises de demolition
 	file couts_env<-csv_file("../includes/017ENV2.csv"); // Fichier des coûts environnementaux en fonction  du matériaux choisi
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
-	 
+	
 	//Variables utilisées pour le monitoring
 	float total_capacite<-0.0;// Permet de calculer le taux d'occupation des centres de tri
 	float total_capacite2<-0.0; // Permet de calculer le taux d'occupation des centres de valo
@@ -51,7 +53,8 @@ global {
 	int nb_valo<-0;//calcul le nombre de centre de valo
 	int nb_tri<-0; //calcul le nombre de centre de tri
 	int nb_reemploi<-0;// calcul le nombre de centre de reemploi
-	int nb_deconstruction<-0;// calcul le nombre d'entreprise de déconstruction
+	int nb_demolition<-0;// calcul le nombre d'entreprise de déconstruction
+	int note<-0;
 	
 	//Matrice résultante du classement des matériaux
 	matrix<float> note_ordre<-nil; 
@@ -63,12 +66,14 @@ global {
 	matrix<string> valorisation_ordre<-nil;
 	matrix<string> reemploi_ordre<-nil;
 	matrix<string> tri_ordre<-nil;
+	matrix<string> demolition_ordre<-nil;
+	
 	//VARIABLE POUVANT ETRE MODIFIE
-	int nb_people<-1; // nombre d'unité opérative 
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
-	float decay_building<-5.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
+	float decay_building<-10.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
 	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
+	int nb_ouvrier<-20;
 	init {
 		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
 		matrix<string> matrix_ordre <- matrix(ordre_mat); 
@@ -78,9 +83,22 @@ global {
 			matrix_ordre[2,i]<-copy_between(matrix_ordre[2,i],0,1);
 		}
 		
-		
+		if(note=0){ // choix du fichier du note à charger
+			csv_note<-note0;
+		}
+		else if(note=1){
+			csv_note<-note1;
+		}
+		else if(note=2){
+			csv_note<-note2;
+		}
+		else if(note=3){
+			csv_note<-note3;
+		}else{
+			csv_note<-note4;
+		}
 		matrix<string> copy_mat<-copy(matrix_ordre);
-		matrix<string> matrix_note<-matrix(note0);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
+		matrix<string> matrix_note<-matrix(csv_note);
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
@@ -117,6 +135,8 @@ global {
 		matrix<string>matrix_tri<-matrix(csv_tri);
 		matrix<string>matrix_enfouissement<-matrix(csv_enfouissement);
 		matrix<string>matrix_valorisation<-matrix(csv_valorisation);
+		matrix<string>matrix_demolition<-matrix(csv_demolition);
+		
 		
 		loop i from: 0 to: matrix_valorisation.rows -1{
 			matrix_valorisation[0,i]<-copy_between(matrix_valorisation[0,i],1,length(matrix_valorisation[0,i]));
@@ -128,19 +148,16 @@ global {
 			matrix_enfouissement[0,i]<-copy_between(matrix_enfouissement[0,i],1,length(matrix_enfouissement[0,i]));
 			matrix_enfouissement[45,i]<-copy_between(matrix_enfouissement[45,i],0,length(matrix_enfouissement[45,i])-1);
 		}
+		loop i from: 0 to: matrix_demolition.rows -1{
+			matrix_demolition[0,i]<-copy_between(matrix_demolition[0,i],1,length(matrix_demolition[0,i]));
+			matrix_demolition[45,i]<-copy_between(matrix_demolition[45,i],0,length(matrix_demolition[45,i])-1);
+		}
 		
 		matrix<string>matrix_capacite<-matrix(capacity);
 		loop i from: 0 to: matrix_capacite.rows -1{
 			matrix_capacite[0,i]<-copy_between(matrix_capacite[0,i],1,length(matrix_capacite[0,i]));
 			matrix_capacite[39,i]<-copy_between(matrix_capacite[39,i],0,length(matrix_capacite[39,i])-1);
 		}
-		
-		
-		
-		
-		
-		
-		
 		
 		point size<-point([1,matrix_ordre.rows]); 
 		int nb<-0;
@@ -161,6 +178,7 @@ global {
 		enfouissement_ordre<-copy(matrix_enfouissement);
 		valorisation_ordre<-copy(matrix_valorisation);
 		reemploi_ordre<-copy(matrix_reemploi);
+		demolition_ordre<-copy(matrix_demolition);
 		tri_ordre<-copy(matrix_tri);
 		matrix_tissus<-transpose(matrix_tissus);
 		tissus_ordre<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-2),0.0);
@@ -202,6 +220,11 @@ global {
 							tri_ordre[j+8,q]<-matrix_tri[i+8,q];
 							
 						}
+						loop r from:0 to: matrix_demolition.rows-1{
+							
+							demolition_ordre[j+8,r]<-matrix_demolition[i+8,r];
+							
+						}
 					}	
 				}
 		
@@ -231,9 +254,9 @@ global {
 		env_ordre<-transpose(env_ordre);
 		
 		
-		create building from:shape_file_MEL{
+		/*create building from:shape_file_MEL{
 			
-		}
+		}*/
 		create enfouissement from:shape_file_enfouissement{ // creation des centres de stockages avec une forte capacité
 					capacite<-3000.0;	
 					total_capacite3<-total_capacite3+capacite;
@@ -366,7 +389,44 @@ global {
 		
 		create entreprise_deconstruction from:shape_file_deconstruction{ // création des entreprises de déconstruction
 			materiaux<-matrix_with(size,0.0); 
-			nb_deconstruction<-nb_deconstruction+1;
+			nb_demolition<-nb_demolition+1;
+			info_acteur<-list_with(matrix_demolition.columns,"0");
+			info_capacite<-list_with(capacite_ordre.columns-2,"0");
+			loop i from:0 to:demolition_ordre.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
+				info_acteur[i]<-demolition_ordre[i,nb_demolition-1];
+			}
+			id_acteur<-info_acteur[0];
+			nb_employe<-info_acteur[2];
+			code_APE<-info_acteur[3];
+			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
+				if(capacite_ordre[1,i] contains (code_APE)){
+					loop j from:2 to: capacite_ordre.columns-1{
+						info_capacite[j-2]<-capacite_ordre[j,i];
+					}
+				}
+			}
+			if(nb_employe mod nb_ouvrier=0){ // on crée des groupes d'ouvrier pour travailler sur les batiment
+				nb_groupe<-nb_employe/nb_ouvrier;
+				create people number:nb_groupe{
+				location <- any_location_in (entreprise_deconstruction[nb_demolition-1]);
+				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
+				nb_employe<-nb_ouvrier;
+				}
+			}
+			else{
+				nb_groupe<-nb_employe/nb_ouvrier;
+				create people number:nb_groupe{
+				location <- any_location_in (entreprise_deconstruction[nb_demolition-1]);
+				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
+				nb_employe<-nb_ouvrier;
+				}
+				create people number:1{
+				location <- any_location_in (entreprise_deconstruction[nb_demolition-1]);
+				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
+				nb_employe<-myself.nb_employe mod nb_ouvrier;
+				}
+			}
+			
 			
 		}
 		create deconstruction  from:shape_file_buildings with:[surface::float(read("Surfaces"))]{ // création des bâtiments à déconstruire
@@ -375,94 +435,13 @@ global {
 			nb_building<-nb_building+1;
 			nb_contrat<-nb_contrat+1;
 			materiaux<-matrix_with(size,0.0);
-				loop i from:0 to:materiaux.rows-1{ // On affecte pour chaque matériaux et pour chaque bâtiment un nombre de tonne entre 0 et 30
+				loop i from:0 to:materiaux.rows-1{ // On affecte pour chaque matériaux et pour chaque bâtiment un nombre de tonne en fonction de sq surface
 					materiaux[0,i]<-surface*tissus_ordre[9,i];
 					mat_total<-mat_total+materiaux[0,i];
 				}
 		}
 		
-		create people number: nb_people { // creation des unités opératives
-			batiment<-one_of(deconstruction);
-			location <- any_location_in (batiment); // on affecte à l'agent une localisation aléatoire en choississant 1 bâtiment de la liste
-			nb_contrat<-nb_contrat-1;
-			id_person<-batiment.id_building;
-			batiment.deconstruction<-true;
-			list_bat<-list(deconstruction);
-			materiaux<-batiment.mat_total;
-			list_traitement<-list(tri);
-			list_reemploi<-list(reemploi);
-			list_enfouissement<-list(enfouissement);
-			list_valo<-list(valorisation);
-			distance<-list_with(length(list_traitement),0.0);
-			distance_enfouissement<-list_with(length(list_enfouissement),0.0);
-			distance_valo<-list_with(length(list_valo),0.0);
-			distance_reemploi<-list_with(length(list_reemploi),0.0);
-			loop i from:0 to:length(list_traitement)-1{   // On calcule la distance entre l'agent et tous les centres de tri existant
-				ask list_traitement at i{
-					myself.distance[i]<-self distance_to myself;
-				}
-			}
-			loop i from:0 to:length(list_enfouissement)-1{   // On calcule la distance entre l'agent et tous les centres de stockage existant
-				ask list_enfouissement at i{
-					myself.distance_enfouissement[i]<-self distance_to myself;
-				}
-			}
-			loop i from:0 to:length(list_valo)-1{   // On calcule la distance entre l'agent et tous les centres de valorisation existant
-				ask list_valo at i{
-					myself.distance_valo[i]<-self distance_to myself;
-				}
-			}
-			loop i from:0 to:length(list_reemploi)-1{   // On calcule la distance entre l'agent et tous les centres de reemploi existant
-				ask list_reemploi at i{
-					myself.distance_reemploi[i]<-self distance_to myself;
-				}
-			}
-			tmp_dist<-copy(distance);
-			tmp_centre<-copy(list_traitement);
-			distance<-distance sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_traitement)-1{ // On classe  la liste des centre de tri par ordre croissant de distance
-				loop j from:0 to: length(list_traitement)-1{
-					if(distance[i]=tmp_dist[j]){
-						list_traitement[i]<-tmp_centre[j];
-					}
-				}
-			}
-			tmp_dist<-copy(distance_enfouissement);
-			tmp_centre<-copy(list_enfouissement);
-			distance_enfouissement<-distance_enfouissement sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_enfouissement)-1{ // On prend le centre de stockage le plus proche
-				loop j from:0 to: length(list_enfouissement)-1{
-					if(distance_enfouissement[i]=tmp_dist[j]){
-						list_enfouissement[i]<-tmp_centre[j];
-					}
-				}				
-			}
-			tmp_dist<-copy(distance_valo);
-			tmp_centre<-copy(list_valo);
-			distance_valo<-distance_valo sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de valorisation par ordre croissant de distance
-				loop j from:0 to: length(list_valo)-1{
-					if(distance_valo[i]=tmp_dist[j]){
-						list_valo[i]<-tmp_centre[j];
-					}
-				}
-			}
-			tmp_dist<-copy(distance_reemploi);
-			tmp_centre<-copy(list_reemploi);
-			distance_reemploi<-distance_reemploi sort_by (each); // On classe par ordre croissant les distances
-			loop i from:0 to: length(list_reemploi)-1{ // On classe  la liste des centre de reemploi par ordre croissant de distance
-				loop j from:0 to: length(list_reemploi)-1{
-					if(distance_reemploi[i]=tmp_dist[j]){
-						list_reemploi[i]<-tmp_centre[j];
-					}
-				}
-			}
-			centre_trie<-list_traitement[0]; // Le centre de tri principal de l'agent est celui le plus proche
-			centre_val<-list_valo[0]; // le centre de valorisation le plus proche devient le principal
-			centre_reemploi<-list_reemploi[0];
-			centre_enfouissement<-list_enfouissement[0];
-			speed<-50#km/#h; // Correspond à la vitesse de déplacement de l'agent lors du changement de bâtiment
-		}
+		
 	}
 	
 }
@@ -476,7 +455,7 @@ species building {
 	list<float>info_capacite;// Liste contenant les capacités de l'acteur pour chaque matériaux
 	int id_building; // id du batiment
 	int id_acteur; // Correspond à l'ID de l'acteur donné dans les fichiers CSV
-	int nb_employe; // Correspond aux nombres d'employés salariés de l'acteur
+	int nb_employe<-0; // Correspond aux nombres d'employés salariés de l'acteur
 	string code_APE<-nil; // Correspond au Code APE de l'acteur
 	
 	
@@ -673,12 +652,13 @@ species reemploi parent:building {
 	}
 }
 species entreprise_deconstruction parent:building { 
-	rgb color<-#gray;
-	people ouvrier;
+	rgb color<-#purple;
+	int nb_groupe;
 }
 species deconstruction parent:building { 
 	float surface;
 	bool deconstruction<-false; // Si le bâtiment est en cours de déconstruction
+	entreprise_deconstruction entreprise_principale<-nil;
 	rgb color<-#blue;
 }
 
@@ -689,6 +669,7 @@ species people skills:[moving]{ // Unité opérative
 	deconstruction batiment<-nil; // bâtiment sur lequel l'agent travaille
 	tri centre_trie<-nil; // centre de tri le plus proche
 	enfouissement centre_enfouissement<-nil; // centre de stockage le plus proche
+	entreprise_deconstruction entreprise_demolition<-nil;
 	valorisation centre_val<-nil;
 	point the_target<-nil; //Pointe sur le prochain bâtiment à déconstruire
 	list<deconstruction> list_bat<-nil; // liste de tous les bâtiments
@@ -708,9 +689,27 @@ species people skills:[moving]{ // Unité opérative
 	bool find_new_centre_valo;
 	bool find_new_reemploi;
 	bool find_new_enfouissement;
-	
+	bool retour;
+	bool depart;
+	bool find_new_deconstruction;
+	bool actif;
+	int nb_employe;
+	init{
+		list_traitement<-list(tri);
+		list_reemploi<-list(reemploi);
+		list_enfouissement<-list(enfouissement);
+		list_valo<-list(valorisation);
+		distance<-list_with(length(list_traitement),0.0);
+		distance_enfouissement<-list_with(length(list_enfouissement),0.0);
+		distance_valo<-list_with(length(list_valo),0.0);
+		distance_reemploi<-list_with(length(list_reemploi),0.0);
+		speed<-50#km/#h; // Correspond à la vitesse de déplacement de l'agent lors du changement de bâtiment
+		retour<-false;
+		depart<-true;
+		actif<-false;
+	}
 	// Les decay diminue le matériaux d'un certain nombre et l'envoi dans les centres  les plus proche
-	reflex decay when: nb_building!=0 and batiment.color=#blue {
+	reflex decay when: actif=true {
 		find_new_enfouissement<-false;
 		find_new_reemploi<-false;
 		find_new_centre<-false;
@@ -909,28 +908,46 @@ species people skills:[moving]{ // Unité opérative
 		}
 	}
 				
-	reflex MAJ_bat when:nb_building!=0 and batiment.color!=#black { // On met à jour le montant total des matériaux. Si cela vaut 0 on passe la couleur du bâtiment à noir
+	reflex MAJ_bat when:nb_building!=0 and actif=true { // On met à jour le montant total des matériaux. Si cela vaut 0 on passe la couleur du bâtiment à noir
 		materiaux<-batiment.mat_total;
-		id_person<-batiment.id_building;
-		if materiaux=0{
+		if materiaux=0.0{
+			actif<-false;
 			batiment.color<-#black;
+			retour<-true;
 			
 		}
 	}
-	reflex change when:nb_contrat!=0 and batiment.color=#black { // Quand le bâtiment est déconstruit on reprend un nouveau bâtiment dans la liste
+	reflex retour_entreprise when:retour=true{
+		the_target<-any_location_in(entreprise_demolition);
+		retour<-false;
+	}
+	reflex change when:nb_contrat!=0 and depart=true { // Quand le bâtiment est déconstruit on reprend un nouveau bâtiment dans la liste
+		find_new_deconstruction<-false;
 		list_bat<-list(deconstruction);
-		if(list_bat!=nil){
+		depart<-false;
+		loop while:find_new_deconstruction=false{
 			batiment<-one_of(list_bat);
-			the_target<-any_location_in(batiment);
-			nb_contrat<-nb_contrat-1;
-			nb_building<-nb_building-1;
-			batiment.deconstruction<-true;
+			if( batiment.nb_employe<=20 and (batiment.entreprise_principale=entreprise_demolition or batiment.entreprise_principale=nil)){
+				the_target<-any_location_in(batiment);
+				write name;
+				write batiment.name;
+				nb_contrat<-nb_contrat-1;
+				nb_building<-nb_building-1;
+				batiment.deconstruction<-true;
+				batiment.nb_employe<-batiment.nb_employe+1;
+				batiment.entreprise_principale<-entreprise_demolition;
+				find_new_deconstruction<-true;
+				materiaux<-batiment.mat_total;
+				id_person<-batiment.id_building;
+			}
+			
 		}
 	}
 	
 	reflex move when: the_target !=nil{ // permet le déplacement de l'agent vers le nouveau bâtiment
 		do goto target:the_target ;
-		if the_target=location{
+		if the_target=location and materiaux!=0.0{
+			actif<-true;
 			the_target<-nil;
 			loop i from:0 to:length(list_traitement)-1{   // On calcule la distance entre l'agent et tous les centres de tri existant
 				ask list_traitement at i{
@@ -995,6 +1012,10 @@ species people skills:[moving]{ // Unité opérative
 			centre_val<-list_valo[0]; // Le centre de valo principal de l'agent est celui le plus proche
 			centre_reemploi<-list_reemploi[0];
 		}
+		else if the_target=location and materiaux=0.0{
+			the_target<-nil;
+			depart<-true;
+		}
 	}
 	
 	reflex die when:nb_contrat=0 and batiment.color=#black{ // Quand tous les bâtiments sont déconstruits on tue les unité opérative
@@ -1003,11 +1024,14 @@ species people skills:[moving]{ // Unité opérative
 	}
 	
 	aspect base{
-		draw circle(30) color: color border: #black;
+		draw circle(60) color: color border: #black;
 	}
 }
 
 experiment RECONVERT type: gui {
+	parameter "Note" var: note min:0 max:4 category: "Parametres" ;
+	parameter "Nb heure" var: nb_heure min:1  category: "Parametres" ;
+	parameter "Nb_ouvrier" var: nb_ouvrier min:1  category: "Parametres" ;
 	output {
 		display VISUEL type:opengl {
 			species tri aspect: base ;
@@ -1017,7 +1041,7 @@ experiment RECONVERT type: gui {
 			species reemploi aspect:base;
 			species entreprise_deconstruction aspect:base;
 			species people aspect: base;
-			species building aspect:base;
+			//species building aspect:base;
 		}
 		
 		display OCCUPATION refresh:every(5#cycles){
@@ -1042,7 +1066,7 @@ experiment RECONVERT type: gui {
 		monitor "Number of tri" value: nb_tri;
 		monitor "Number of stockage" value: nb_stockage;
 		monitor "Number of reemploi" value: nb_reemploi;
-		monitor "Number of entreprise deconstruction" value: nb_deconstruction;
+		monitor "Number of entreprise deconstruction" value: nb_demolition;
 		monitor "Number of valo" value: nb_valo;
 	}
 }
