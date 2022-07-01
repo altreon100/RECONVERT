@@ -45,7 +45,19 @@ global {
 	float som_cout<-0.0; // Calcul le coûts en € de la déconstruction des bâtiments
 	float som_env_eau<-0.0; // Calcul le coûts en eau  de la déconstruction des bâtiments 
 	float som_env_co2<-0.0; // Calcul le coûts en CO2  de la déconstruction des bâtiments 
-	float som_env_energie<-0.0; // Calcul le coûts en energie  de la déconstruction des bâtiments 
+	float som_env_energie<-0.0; // Calcul le coûts en energie  de la déconstruction des bâtiments
+	float tot_reemploi_site<-0.0;
+	float tot_reemploi_hors_site<-0.0;
+	float tot_reutilisation_site<-0.0;
+	float tot_reutilisation_hors_site<-0.0;
+	float tot_envoi_tri<-0.0;
+	float tot_valo_matiere;
+	float tot_valo_energetique<-0.0;
+	float tot_REP<-0.0;
+	float tot_stockage_ISDI<-0.0;
+	float tot_stockage_ISDND<-0.0;
+	float tot_stockage_ISDD<-0.0;
+	float tot_autre_elimination<-0.0;
 	int id<-0; //l'id de tout les bâtiment
 	int nb_building<-0; // calcul en temps réel le nombre de bâtiment qui reste à déconstruire 
 	int nb_contrat<-0; // calcul en temps réel le nombre de contrat qui reste  
@@ -54,7 +66,7 @@ global {
 	int nb_tri<-0; //calcul le nombre de centre de tri
 	int nb_reemploi<-0;// calcul le nombre de centre de reemploi
 	int nb_demolition<-0;// calcul le nombre d'entreprise de déconstruction
-	int note<-0;
+	int note<-4;
 	
 	//Matrice résultante du classement des matériaux
 	matrix<float> note_ordre<-nil; 
@@ -233,7 +245,7 @@ global {
 		tissus_ordre<-transpose(tissus_ordre);
 		
 		matrix_cout<-transpose(matrix_cout);
-		point size3<-[matrix_cout.columns,4];
+		point size3<-point([matrix_cout.columns,4]);
 		cout_ordre<-matrix_with(size3,0.0);
 		matrix_env<-transpose(matrix_env);
 		env_ordre<-matrix_with(point([matrix_env.columns,3]),0.0);
@@ -262,19 +274,22 @@ global {
 					total_capacite3<-total_capacite3+capacite;
 					init_tot_capacite3<-init_tot_capacite3+capacite;
 					nb_stockage<-nb_stockage+1;
-					materiaux<-matrix_with(size,0.0);
+					stockage_ISDI<-list_with(note_ordre.rows,0.0);
+					stockage_ISDND<-list_with(note_ordre.rows,0.0);
+					stockage_ISDD<-list_with(note_ordre.rows,0.0);
+					autre_elimination<-list_with(note_ordre.rows,0.0);
 					info_acteur<-list_with(matrix_enfouissement.columns,"0");
-					info_capacite<-list_with(capacite_ordre.columns-2,"0");
+					info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 					loop i from:0 to:enfouissement_ordre.columns-1{ // Pour chaque centre d'enfouissement on récupère les infos de la matrice
 				info_acteur[i]<-enfouissement_ordre[i,nb_stockage-1];
 			}
-			id_acteur<-info_acteur[0];
-			nb_employe<-info_acteur[2];
+			id_acteur<-int(info_acteur[0]);
+			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
-						info_capacite[j-2]<-capacite_ordre[j,i];
+						info_capacite[j-2]<-float(capacite_ordre[j,i]);
 					}
 				}
 			}
@@ -284,20 +299,22 @@ global {
 			capacite<-40.0;
 			total_capacite2<-total_capacite2+capacite;
 			init_tot_capacite2<-init_tot_capacite2+capacite;
-				nb_valo<-nb_valo+1;
-				materiaux<-matrix_with(size,0.0);
+			nb_valo<-nb_valo+1;
+			valo_matiere<-list_with(note_ordre.rows,0.0);
+			valo_energetique<-list_with(note_ordre.rows,0.0);
+			REP<-list_with(note_ordre.rows,0.0);
 			info_acteur<-list_with(matrix_valorisation.columns,"0");
-			info_capacite<-list_with(capacite_ordre.columns-2,"0");
+			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 			loop i from:0 to:valorisation_ordre.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
 				info_acteur[i]<-valorisation_ordre[i,nb_valo-1];
 			}
-			id_acteur<-info_acteur[0];
-			nb_employe<-info_acteur[2];
+			id_acteur<-int(info_acteur[0]);
+			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
-						info_capacite[j-2]<-capacite_ordre[j,i];
+						info_capacite[j-2]<-float(capacite_ordre[j,i]);
 					}
 				}
 			}
@@ -308,8 +325,8 @@ global {
 			capacite<-400.0;
 			total_capacite<-total_capacite+capacite;
 			init_tot_capacite<-init_tot_capacite+capacite;
-				nb_tri<-nb_tri+1;
-				materiaux<-matrix_with(size,0.0);
+			nb_tri<-nb_tri+1;
+			envoi_tri<-list_with(note_ordre.rows,0.0);
 			list_enfouissement<-list(enfouissement);
 			list_valo<-list(valorisation);
 			distance_enfouissement<-list_with(length(enfouissement),0.0);
@@ -331,7 +348,7 @@ global {
 			loop i from:0 to: length(list_enfouissement)-1{ // On prend le centre de stockage le plus proche
 				loop j from:0 to: length(list_enfouissement)-1{
 					if(distance_enfouissement[i]=tmp_dist[j]){
-						list_enfouissement[i]<-tmp_centre[j];
+						list_enfouissement[i]<-enfouissement(tmp_centre[j]);
 					}
 				}				
 			}
@@ -341,24 +358,24 @@ global {
 			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de valorisation par ordre croissant de distance
 				loop j from:0 to: length(list_valo)-1{
 					if(distance_valo[i]=tmp_dist[j]){
-						list_valo[i]<-tmp_centre[j];
+						list_valo[i]<-valorisation(tmp_centre[j]);
 					}
 				}
 			}
 			centre_val<-list_valo[0];
 			centre_enfouissement<-list_enfouissement[0];
 			info_acteur<-list_with(matrix_tri.columns,"0");
-			info_capacite<-list_with(capacite_ordre.columns-2,"0");
+			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 			loop i from:0 to:tri_ordre.columns-1{ // Pour chaque centre de tri on récupère les infos de la matrice
 				info_acteur[i]<-tri_ordre[i,nb_tri-1];
 			}
-			id_acteur<-info_acteur[0];
-			nb_employe<-info_acteur[2];
+			id_acteur<-int(info_acteur[0]);
+			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
-						info_capacite[j-2]<-capacite_ordre[j,i];
+						info_capacite[j-2]<-float(capacite_ordre[j,i]);
 					}
 				}
 			}
@@ -368,20 +385,23 @@ global {
 			capacite<-40.0;
 			total_capacite4<-total_capacite4+capacite;
 			init_tot_capacite4<-init_tot_capacite4+capacite;
-			materiaux<-matrix_with(size,0.0);
+			reemploi_site<-list_with(note_ordre.rows,0.0);
+			reemploi_hors_site<-list_with(note_ordre.rows,0.0);
+			reutilisation_site<-list_with(note_ordre.rows,0.0);
+			reutilisation_hors_site<-list_with(note_ordre.rows,0.0);
 			nb_reemploi<-nb_reemploi+1;
 			info_acteur<-list_with(matrix_reemploi.columns,"0");
-			info_capacite<-list_with(capacite_ordre.columns-2,"0");
+			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 			loop i from:0 to:reemploi_ordre.columns-1{ // Pour chaque reemploi on récupère les infos de la matrice
 				info_acteur[i]<-reemploi_ordre[i,nb_reemploi-1];
 			}
-			id_acteur<-info_acteur[0];
-			nb_employe<-info_acteur[2];
+			id_acteur<-int(info_acteur[0]);
+			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
-						info_capacite[j-2]<-capacite_ordre[j,i];
+						info_capacite[j-2]<-float(capacite_ordre[j,i]);
 					}
 				}
 			}
@@ -391,22 +411,22 @@ global {
 			materiaux<-matrix_with(size,0.0); 
 			nb_demolition<-nb_demolition+1;
 			info_acteur<-list_with(matrix_demolition.columns,"0");
-			info_capacite<-list_with(capacite_ordre.columns-2,"0");
+			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 			loop i from:0 to:demolition_ordre.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
 				info_acteur[i]<-demolition_ordre[i,nb_demolition-1];
 			}
-			id_acteur<-info_acteur[0];
-			nb_employe<-info_acteur[2];
+			id_acteur<-int(info_acteur[0]);
+			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
-						info_capacite[j-2]<-capacite_ordre[j,i];
+						info_capacite[j-2]<-float(capacite_ordre[j,i]);
 					}
 				}
 			}
-			if(nb_employe mod nb_ouvrier=0){ // on crée des groupes d'ouvrier pour travailler sur les batiment
-				nb_groupe<-nb_employe/nb_ouvrier;
+			/*if(nb_employe mod nb_ouvrier=0){ // on crée des groupes d'ouvrier pour travailler sur les batiment
+				nb_groupe<-int(nb_employe/nb_ouvrier);
 				create people number:nb_groupe{
 				location <- any_location_in (entreprise_deconstruction[nb_demolition-1]);
 				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
@@ -414,7 +434,7 @@ global {
 				}
 			}
 			else{
-				nb_groupe<-nb_employe/nb_ouvrier;
+				nb_groupe<-int(nb_employe/nb_ouvrier);
 				create people number:nb_groupe{
 				location <- any_location_in (entreprise_deconstruction[nb_demolition-1]);
 				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
@@ -425,7 +445,7 @@ global {
 				entreprise_demolition<-entreprise_deconstruction[nb_demolition-1];
 				nb_employe<-myself.nb_employe mod nb_ouvrier;
 				}
-			}
+			}*/
 			
 			
 		}
@@ -440,6 +460,11 @@ global {
 					mat_total<-mat_total+materiaux[0,i];
 				}
 		}
+		create people number:1{
+				location <- any_location_in (entreprise_deconstruction[0]);
+				entreprise_demolition<-entreprise_deconstruction[0];
+				nb_employe<-20;
+				}
 		
 		
 	}
@@ -450,22 +475,13 @@ species building {
 	rgb color<-#gray;
 	float mat_total<-0.0; // Calcul du total de matériaux restant 
 	float capacite; // Pour les centre de tri correspond à la capacité maximale du centre
-	matrix<float>  materiaux<-nil; // liste de tous les matériaux existant
+	
 	list<string> info_acteur; // Liste contenant les informations de l'acteur (code APE,ID,matériaux traités,...)
 	list<float>info_capacite;// Liste contenant les capacités de l'acteur pour chaque matériaux
 	int id_building; // id du batiment
 	int id_acteur; // Correspond à l'ID de l'acteur donné dans les fichiers CSV
 	int nb_employe<-0; // Correspond aux nombres d'employés salariés de l'acteur
 	string code_APE<-nil; // Correspond au Code APE de l'acteur
-	
-	
-	reflex tot when: color!=#gray{ // calcul le total de matériaux restant 
-		mat_total<-0.0;
-		loop i from:0 to:materiaux.rows-1{
-			mat_total<-mat_total+materiaux[0,i];
-		}
-	
-	}	
 	
 	reflex die when: color=#black{  // Si le bâtiment a finit d'être déconstruit on le tue
 		do die;
@@ -476,6 +492,10 @@ species building {
 }
 
 species enfouissement parent:building {  // les centres de stockage sont passifs il n'y a pas de sorti
+	list<float> stockage_ISDI<-nil;
+	list<float> stockage_ISDND<-nil;
+	list<float> stockage_ISDD<-nil;
+	list<float> autre_elimination<-nil;
 	rgb color<-#green;
 	
 }
@@ -484,6 +504,7 @@ species enfouissement parent:building {  // les centres de stockage sont passifs
 species tri parent:building {  // les centres de tri vont disparaître une certaine quantité par step
 	rgb color<-#red;
 	enfouissement centre_stockage<-nil;
+	list<float> envoi_tri<-nil;
 	list<float>distance_enfouissement<-nil;
 	list<float>distance_valo<-nil;
 	list<valorisation>list_valo<-nil;
@@ -495,13 +516,22 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 	bool find_new_centre_valo<-false;
 	bool find_new_enfouissement<-false;
 	reflex decay{
-		loop i from:0 to:materiaux.rows-1{
+		loop i from:0 to:length(envoi_tri)-1{
 			find_new_centre_valo<-false;
 			find_new_enfouissement<-false;
-			if(materiaux[0,i]>= info_capacite[i]*nb_heure and nb_employe!=0){
+			if(envoi_tri[i]>= info_capacite[i]*nb_heure and nb_employe!=0){
 				nb_employe<-nb_employe-1;
 				if(centre_enfouissement.capacite>=pourcentage_tri*info_capacite[i]*nb_heure and centre_enfouissement.info_acteur[i+8]="1"){
-					centre_enfouissement.materiaux[0,i]<-centre_enfouissement.materiaux[0,i] + pourcentage_tri*info_capacite[i]*nb_heure;
+					
+					centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					
+					tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 					total_capacite3<-total_capacite3-pourcentage_tri*info_capacite[i]*nb_heure;
 					som_cout<-som_cout+cout_ordre[2,i]*pourcentage_tri*info_capacite[i]*nb_heure;
@@ -512,7 +542,16 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
 							if(list_enfouissement[j].capacite>=pourcentage_tri*info_capacite[i]*nb_heure and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
-								list_enfouissement[j].materiaux[0,i]<-list_enfouissement[j].materiaux[0,i]+pourcentage_tri*info_capacite[i]*nb_heure;
+			
+								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								
+								tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+								tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 								total_capacite<-total_capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 								som_cout<-som_cout+cout_ordre[0,i]*pourcentage_tri*info_capacite[i]*nb_heure;
@@ -525,7 +564,14 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					}
 				
 				if(centre_val.capacite>=(1-pourcentage_tri)*info_capacite[i]*nb_heure and centre_val.info_acteur[i+8]="1"){
-					centre_val.materiaux[0,i]<-centre_val.materiaux[0,i] + (1-pourcentage_tri)*info_capacite[i]*nb_heure;
+					
+					centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+					centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+					centre_val.REP[i]<-centre_val.REP[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+						
+					tot_valo_matiere<-tot_valo_matiere+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+					tot_valo_energetique<-tot_valo_energetique+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+					tot_REP<-tot_REP+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
 					centre_val.capacite<-centre_val.capacite-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 					total_capacite2<-total_capacite2-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 					som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
@@ -536,7 +582,14 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 				else{ 
 						loop j from:0 to:length(list_valo)-1{
 							if(list_valo[j].capacite>=(1-pourcentage_tri)*info_capacite[i]*nb_heure and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
-								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+(1-pourcentage_tri)*info_capacite[i]*nb_heure;
+								
+								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+								list_valo[j].REP[i]<-list_valo[j].REP[i]+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+								
+								tot_valo_matiere<-tot_valo_matiere+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+								tot_valo_energetique<-tot_valo_energetique+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
+								tot_REP<-tot_REP+((1-pourcentage_tri)*info_capacite[i]*nb_heure)/3.0;
 								list_valo[j].capacite<-list_valo[j].capacite-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 								total_capacite2<-total_capacite2-(1-pourcentage_tri)*info_capacite[i]*nb_heure;
 								som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*info_capacite[i]*nb_heure;
@@ -547,119 +600,195 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 							}
 						}
 					}
-				materiaux[0,i]<-materiaux[0,i]-info_capacite[i]*nb_heure;
+				envoi_tri[i]<-envoi_tri[i]-info_capacite[i]*nb_heure;
 				capacite<-capacite+info_capacite[i]*nb_heure;
 				total_capacite<-total_capacite+info_capacite[i]*nb_heure;
 			}
-			else if(materiaux[0,i]>0.0 and nb_employe!=0){
+			else if(envoi_tri[i]>0.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				if(centre_enfouissement.capacite>=pourcentage_tri*materiaux[0,i] and centre_enfouissement.info_acteur[i+8]="1"){
-					centre_enfouissement.materiaux[0,i]<-centre_enfouissement.materiaux[0,i] + pourcentage_tri*materiaux[0,i];
-					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*materiaux[0,i];
-					total_capacite3<-total_capacite3-pourcentage_tri*materiaux[0,i];
-					som_cout<-som_cout+cout_ordre[2,i]*pourcentage_tri*materiaux[0,i];
-					som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*materiaux[0,i];
-					som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*materiaux[0,i];
-					som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*materiaux[0,i];
+				if(centre_enfouissement.capacite>=pourcentage_tri*envoi_tri[i] and centre_enfouissement.info_acteur[i+8]="1"){
+	
+					centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+					centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+					centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+					centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+					
+					tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
+					tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
+					tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+					tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
+					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*envoi_tri[i];
+					total_capacite3<-total_capacite3-pourcentage_tri*envoi_tri[i];
+					som_cout<-som_cout+cout_ordre[2,i]*pourcentage_tri*envoi_tri[i];
+					som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*envoi_tri[i];
+					som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*envoi_tri[i];
+					som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*envoi_tri[i];
 					}
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
-							if(list_enfouissement[j].capacite>=pourcentage_tri*materiaux[0,i] and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
-								list_enfouissement[j].materiaux[0,i]<-list_enfouissement[j].materiaux[0,i]+pourcentage_tri*materiaux[0,i];
-								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*materiaux[0,i];
-								total_capacite<-total_capacite-pourcentage_tri*materiaux[0,i];
-								som_cout<-som_cout+cout_ordre[0,i]*pourcentage_tri*materiaux[0,i];
-								som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*materiaux[0,i];
-								som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*materiaux[0,i];
-								som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*materiaux[0,i];
+							if(list_enfouissement[j].capacite>=pourcentage_tri*envoi_tri[i] and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
+								
+								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+(pourcentage_tri*envoi_tri[i])/4.0;
+								
+								tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
+								tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
+								tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+								tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
+								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*envoi_tri[i];
+								total_capacite<-total_capacite-pourcentage_tri*envoi_tri[i];
+								som_cout<-som_cout+cout_ordre[0,i]*pourcentage_tri*envoi_tri[i];
+								som_env_eau<-som_env_eau-env_ordre[0,i]*pourcentage_tri*envoi_tri[i];
+								som_env_energie<-som_env_energie-env_ordre[1,i]*pourcentage_tri*envoi_tri[i];
+								som_env_co2<-som_env_co2-env_ordre[2,i]*pourcentage_tri*envoi_tri[i];
 								find_new_enfouissement<-true;
 							}
 						}
 					}
-				if(centre_val.capacite>=(1-pourcentage_tri)*materiaux[0,i] and centre_val.info_acteur[i+8]="1"){
-					centre_val.materiaux[0,i]<-centre_val.materiaux[0,i] + (1-pourcentage_tri)*materiaux[0,i];
-					centre_val.capacite<-centre_val.capacite-(1-pourcentage_tri)*materiaux[0,i];
-					total_capacite2<-total_capacite2-(1-pourcentage_tri)*materiaux[0,i];
-					som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*materiaux[0,i];
-					som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*materiaux[0,i];
-					som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*materiaux[0,i];
-					som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*materiaux[0,i];
+				if(centre_val.capacite>=(1-pourcentage_tri)*envoi_tri[i] and centre_val.info_acteur[i+8]="1"){
+					
+					centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+					centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+					centre_val.REP[i]<-centre_val.REP[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+						
+					tot_valo_matiere<-tot_valo_matiere+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+					tot_valo_energetique<-tot_valo_energetique+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+					tot_REP<-tot_REP+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+					centre_val.capacite<-centre_val.capacite-(1-pourcentage_tri)*envoi_tri[i];
+					total_capacite2<-total_capacite2-(1-pourcentage_tri)*envoi_tri[i];
+					som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*envoi_tri[i];
+					som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*envoi_tri[i];
+					som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*envoi_tri[i];
+					som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*envoi_tri[i];
 				}
 				else{ 
 						loop j from:0 to:length(list_valo)-1{
-							if(list_valo[j].capacite>=(1-pourcentage_tri)*materiaux[0,i] and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
-								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+(1-pourcentage_tri)*materiaux[0,i];
-								list_valo[j].capacite<-list_valo[j].capacite-(1-pourcentage_tri)*materiaux[0,i];
-								total_capacite2<-total_capacite2-(1-pourcentage_tri)*materiaux[0,i];
-								som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*materiaux[0,i];
-								som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*materiaux[0,i];
-								som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*materiaux[0,i];
-								som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*materiaux[0,i];
+							if(list_valo[j].capacite>=(1-pourcentage_tri)*envoi_tri[i] and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
+								
+								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+								list_valo[j].REP[i]<-list_valo[j].REP[i]+((1-pourcentage_tri)*envoi_tri[i])/3.0;
+								
+								tot_valo_matiere<-tot_valo_matiere+(1-pourcentage_tri)*envoi_tri[i];
+								tot_valo_energetique<-tot_valo_energetique+(1-pourcentage_tri)*envoi_tri[i];
+								tot_REP<-tot_REP+(1-pourcentage_tri)*envoi_tri[i];
+								list_valo[j].capacite<-list_valo[j].capacite-(1-pourcentage_tri)*envoi_tri[i];
+								total_capacite2<-total_capacite2-(1-pourcentage_tri)*envoi_tri[i];
+								som_cout<-som_cout+cout_ordre[3,i]*(1-pourcentage_tri)*envoi_tri[i];
+								som_env_eau<-som_env_eau+env_ordre[0,i]*(1-pourcentage_tri)*envoi_tri[i];
+								som_env_energie<-som_env_energie+env_ordre[1,i]*(1-pourcentage_tri)*envoi_tri[i];
+								som_env_co2<-som_env_co2+env_ordre[2,i]*(1-pourcentage_tri)*envoi_tri[i];
 								find_new_centre_valo<-true;
 							}
 						}
 					}
-				capacite<-capacite+materiaux[0,i];
-				total_capacite<-total_capacite+materiaux[0,i];
-				materiaux[0,i]<-0.0;
+				capacite<-capacite+envoi_tri[i];
+				total_capacite<-total_capacite+envoi_tri[i];
+				envoi_tri[i]<-0.0;
 			}
 		}
-		nb_employe<-info_acteur[2];
+		nb_employe<-int(info_acteur[2]);
 	}
 }
 
 species valorisation parent:building { // les centres de valorisation vont disparaître une certaine quantité par step
+	list<float> valo_matiere<-nil;
+	list<float> valo_energetique<-nil;
+	list<float> REP<-nil;
 	rgb color<-#orange;
 	reflex decay {
-		loop i from:0 to:materiaux.rows-1{
-			if(materiaux[0,i]>=info_capacite[i]*nb_heure and nb_employe!=0){
+		loop i from:0 to:length(valo_matiere)-1{
+			
+			if(valo_matiere[i]>=(info_capacite[i]*nb_heure)/3.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				materiaux[0,i]<-materiaux[0,i]-info_capacite[i]*nb_heure;
-				capacite<-capacite+info_capacite[i]*nb_heure;
-				total_capacite2<-total_capacite2+info_capacite[i]*nb_heure;
+				valo_matiere[i]<-valo_matiere[i]-(info_capacite[i]*nb_heure)/3.0;
+				capacite<-capacite+(info_capacite[i]*nb_heure)/3.0;
+				total_capacite2<-total_capacite2+(info_capacite[i]*nb_heure)/3.0;
 			}
-			else if(materiaux[0,i]>0.0 and nb_employe!=0){
+			else if(valo_matiere[i]>0.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				capacite<-capacite+materiaux[0,i];
-				total_capacite2<-total_capacite2+materiaux[0,i];
-				materiaux[0,i]<-0.0;
+				capacite<-capacite+valo_matiere[i];
+				total_capacite2<-total_capacite2+valo_matiere[i];
+				valo_matiere[i]<-0.0;
+			}
+			if(valo_energetique[i]>=(info_capacite[i]*nb_heure)/3.0 and nb_employe!=0){
+				valo_energetique[i]<-valo_energetique[i]-(info_capacite[i]*nb_heure)/3.0;
+				capacite<-capacite+(info_capacite[i]*nb_heure)/3.0;
+				total_capacite2<-total_capacite2+(info_capacite[i]*nb_heure)/3.0;
+			}
+			else if(valo_energetique[i]>0.0 and nb_employe!=0){
+				capacite<-capacite+valo_energetique[i];
+				total_capacite2<-total_capacite2+valo_energetique[i];
+				valo_energetique[i]<-0.0;
+			}
+			if(REP[i]>=(info_capacite[i]*nb_heure)/3.0 and nb_employe!=0){
+				REP[i]<-REP[i]-(info_capacite[i]*nb_heure)/3.0;
+				capacite<-capacite+(info_capacite[i]*nb_heure)/3.0;
+				total_capacite2<-total_capacite2+(info_capacite[i]*nb_heure)/3.0;
+			}
+			else if(REP[i]>0.0 and nb_employe!=0){
+				capacite<-capacite+REP[i];
+				total_capacite2<-total_capacite2+REP[i];
+				REP[i]<-0.0;
 			}
 		}
-		nb_employe<-info_acteur[2];
+		nb_employe<-int(info_acteur[2]);
 	}
 	
 	
 	
 }
-species reemploi parent:building { 
+species reemploi parent:building {
+	list<float> reemploi_site<-nil;
+	list<float> reemploi_hors_site<-nil;
+	list<float> reutilisation_site<-nil;
+	list<float> reutilisation_hors_site<-nil;
 	rgb color<-#pink;
 	reflex decay {
-		loop i from:0 to:materiaux.rows-1{
-			if(materiaux[0,i]>=info_capacite[i]*nb_heure and nb_employe!=0){
+		loop i from:0 to:length(reemploi_site)-1{
+			if(reemploi_site[i]>=(info_capacite[i]*nb_heure)/4.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				materiaux[0,i]<-materiaux[0,i]-info_capacite[i]*nb_heure;
+				reemploi_site[i]<-reemploi_site[i]-(info_capacite[i]*nb_heure)/4.0;
+				reemploi_hors_site[i]<-reemploi_hors_site[i]-(info_capacite[i]*nb_heure)/4.0;
+				reutilisation_site[i]<-reutilisation_site[i]-(info_capacite[i]*nb_heure)/4.0;
+				reutilisation_hors_site[i]<-reutilisation_hors_site[i]-(info_capacite[i]*nb_heure)/4.0;
 				capacite<-capacite+info_capacite[i]*nb_heure;
 				total_capacite4<-total_capacite4+info_capacite[i]*nb_heure;
 			}
-			else if(materiaux[0,i]>0.0 and nb_employe!=0){
+			else if(reemploi_site[i]>0.0 and nb_employe!=0){
 				nb_employe<-nb_employe-1;
-				capacite<-capacite+materiaux[0,i];
-				total_capacite4<-total_capacite4+materiaux[0,i];
-				materiaux[0,i]<-0.0;
+				capacite<-capacite+reemploi_site[i]+reemploi_hors_site[i]+reutilisation_site[i]+reutilisation_hors_site[i];
+				total_capacite4<-total_capacite4+reemploi_site[i]+reemploi_hors_site[i]+reutilisation_site[i]+reutilisation_hors_site[i];
+				reemploi_site[i]<-0.0;
+				reemploi_hors_site[i]<-0.0;
+				reutilisation_site[i]<-0.0;
+				reutilisation_hors_site[i]<-0.0;
 			}
 		}
-		nb_employe<-info_acteur[2];
+		nb_employe<-int(info_acteur[2]);
 	}
 }
-species entreprise_deconstruction parent:building { 
+species entreprise_deconstruction parent:building {
+	matrix<float>  materiaux<-nil; 
 	rgb color<-#purple;
 	int nb_groupe;
 }
 species deconstruction parent:building { 
+	matrix<float>  materiaux<-nil; // liste de tous les matériaux existant
 	float surface;
 	bool deconstruction<-false; // Si le bâtiment est en cours de déconstruction
 	entreprise_deconstruction entreprise_principale<-nil;
 	rgb color<-#blue;
+	
+	reflex tot when: color!=#gray{ // calcul le total de matériaux restant 
+		mat_total<-0.0;
+		loop i from:0 to:materiaux.rows-1{
+			mat_total<-mat_total+materiaux[0,i];
+		}
+	
+	}
 }
 
 species people skills:[moving]{ // Unité opérative
@@ -722,7 +851,15 @@ species people skills:[moving]{ // Unité opérative
 					batiment.materiaux[0,i]<-batiment.materiaux[0,i] -decay_building;
 					// On envoit une partie en enfouissement
 					if(centre_enfouissement.capacite>=(decay_building*(note_ordre[8,i]+note_ordre[1,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i])) and centre_enfouissement.info_acteur[i+8]="1"){
-					centre_enfouissement.materiaux[0,i]<-centre_enfouissement.materiaux[0,i]+decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+					centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+decay_building*note_ordre[8,i];
+					centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+decay_building*note_ordre[9,i];
+					centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+decay_building*note_ordre[10,i];
+					centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+decay_building*note_ordre[11,i];
+					
+					tot_stockage_ISDI<-tot_stockage_ISDI+decay_building*note_ordre[8,i];
+					tot_stockage_ISDND<-tot_stockage_ISDND+decay_building*note_ordre[9,i];
+					tot_stockage_ISDI<-tot_stockage_ISDD+decay_building*note_ordre[10,i];
+					tot_autre_elimination<-tot_autre_elimination+decay_building*note_ordre[11,i];
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					total_capacite3<-total_capacite3-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					som_cout<-som_cout+cout_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -733,7 +870,15 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
 							if(list_enfouissement[j].capacite>=decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]) and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
-								list_enfouissement[j].materiaux[0,i]<-list_enfouissement[j].materiaux[0,i]+decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+decay_building*note_ordre[8,i];
+								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+decay_building*note_ordre[9,i];
+								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+decay_building*note_ordre[10,i];
+								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+decay_building*note_ordre[11,i];
+					
+								tot_stockage_ISDI<-tot_stockage_ISDI+decay_building*note_ordre[8,i];
+								tot_stockage_ISDND<-tot_stockage_ISDND+decay_building*note_ordre[9,i];
+								tot_stockage_ISDI<-tot_stockage_ISDD+decay_building*note_ordre[10,i];
+								tot_autre_elimination<-tot_autre_elimination+decay_building*note_ordre[11,i];
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								total_capacite<-total_capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								som_cout<-som_cout+cout_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -746,7 +891,9 @@ species people skills:[moving]{ // Unité opérative
 					}
 					// Un autre partie en centre de tri
 					if(centre_trie.capacite>=(decay_building*note_ordre[4,i])and centre_trie.info_acteur[i+8]="1"){
-						centre_trie.materiaux[0,i]<-centre_trie.materiaux[0,i]+decay_building*note_ordre[4,i];
+						centre_trie.envoi_tri[i]<-centre_trie.envoi_tri[i]+decay_building*note_ordre[4,i];
+						
+						tot_envoi_tri<-tot_envoi_tri+decay_building*note_ordre[4,i];
 						centre_trie.capacite<-centre_trie.capacite-decay_building*note_ordre[4,i];
 						total_capacite<-total_capacite-decay_building*note_ordre[4,i];
 						som_cout<-som_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
@@ -754,7 +901,9 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de tri le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_traitement)-1{
 							if(list_traitement[j].capacite>=decay_building*note_ordre[4,i] and list_traitement[j].info_acteur[i+8]="1" and find_new_centre=false){
-								list_traitement[j].materiaux[0,i]<-list_traitement[j].materiaux[0,i]+decay_building*note_ordre[4,i];
+								list_traitement[j].envoi_tri[i]<-list_traitement[j].envoi_tri[i]+decay_building*note_ordre[4,i];
+								
+								tot_envoi_tri<-tot_envoi_tri+decay_building*note_ordre[4,i];
 								list_traitement[j].capacite<-list_traitement[j].capacite-decay_building*note_ordre[4,i];
 								total_capacite<-total_capacite-decay_building*note_ordre[4,i];
 								som_cout<-som_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
@@ -764,7 +913,15 @@ species people skills:[moving]{ // Unité opérative
 					}
 					// Ensuite les centres de réemploi
 					if(centre_reemploi.capacite>=(decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i])) and centre_reemploi.info_acteur[i+8]="1"){
-						centre_reemploi.materiaux[0,i]<-centre_reemploi.materiaux[0,i]+decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						centre_reemploi.reemploi_site[i]<-centre_reemploi.reemploi_site[i]+decay_building*note_ordre[0,i];
+						centre_reemploi.reutilisation_site[i]<-centre_reemploi.reutilisation_site[i]+decay_building*note_ordre[1,i];
+						centre_reemploi.reemploi_hors_site[i]<-centre_reemploi.reemploi_hors_site[i]+decay_building*note_ordre[2,i];
+						centre_reemploi.reutilisation_hors_site[i]<-centre_reemploi.reutilisation_hors_site[i]+decay_building*note_ordre[3,i];
+						
+						tot_reemploi_site<-tot_reemploi_site+decay_building*note_ordre[0,i];
+						tot_reutilisation_site<-tot_reutilisation_site+decay_building*note_ordre[1,i];
+						tot_reemploi_hors_site<-tot_reemploi_hors_site+decay_building*note_ordre[2,i];
+						tot_reutilisation_hors_site<-tot_reutilisation_hors_site+decay_building*note_ordre[3,i];
 						centre_reemploi.capacite<-centre_reemploi.capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -775,7 +932,15 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
 							if(list_reemploi[j].capacite>=decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_acteur[i+8]="1" and find_new_reemploi=false){
-								list_reemploi[j].materiaux[0,i]<-list_reemploi[j].materiaux[0,i]+decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								list_reemploi[j].reemploi_site[i]<-list_reemploi[j].reemploi_site[i]+decay_building*note_ordre[0,i];
+								list_reemploi[j].reutilisation_site[i]<-list_reemploi[j].reutilisation_site[i]+decay_building*note_ordre[1,i];
+								list_reemploi[j].reemploi_hors_site[i]<-list_reemploi[j].reemploi_hors_site[i]+decay_building*note_ordre[2,i];
+								list_reemploi[j].reutilisation_hors_site[i]<-list_reemploi[j].reutilisation_hors_site[i]+decay_building*note_ordre[3,i];
+								
+								tot_reemploi_site<-tot_reemploi_site+decay_building*note_ordre[0,i];
+								tot_reutilisation_site<-tot_reutilisation_site+decay_building*note_ordre[1,i];
+								tot_reemploi_hors_site<-tot_reemploi_hors_site+decay_building*note_ordre[2,i];
+								tot_reutilisation_hors_site<-tot_reutilisation_hors_site+decay_building*note_ordre[3,i];
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -788,7 +953,13 @@ species people skills:[moving]{ // Unité opérative
 					}
 					// et le reste en valorisation
 					if(centre_val.capacite>=(decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))and centre_val.info_acteur[i+8]="1"){
-						centre_val.materiaux[0,i]<-centre_val.materiaux[0,i]+decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+decay_building*note_ordre[5,i];
+						centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+decay_building*note_ordre[6,i];
+						centre_val.REP[i]<-centre_val.REP[i]+decay_building*note_ordre[7,i];
+						
+						tot_valo_matiere<-tot_valo_matiere+decay_building*note_ordre[5,i];
+						tot_valo_energetique<-tot_valo_energetique+decay_building*note_ordre[6,i];
+						tot_REP<-tot_REP+decay_building*note_ordre[7,i];
 						centre_val.capacite<-centre_val.capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -799,7 +970,13 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de valo le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
 							if(list_valo[j].capacite>=decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
-								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+decay_building*note_ordre[5,i];
+								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+decay_building*note_ordre[6,i];
+								list_valo[j].REP[i]<-list_valo[j].REP[i]+decay_building*note_ordre[7,i];
+								
+								tot_valo_matiere<-tot_valo_matiere+decay_building*note_ordre[5,i];
+								tot_valo_energetique<-tot_valo_energetique+decay_building*note_ordre[6,i];
+								tot_REP<-tot_REP+decay_building*note_ordre[7,i];
 								list_valo[j].capacite<-list_valo[j].capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -813,7 +990,16 @@ species people skills:[moving]{ // Unité opérative
 				}
 				else{ // Si le nombre de tonnes du matériaux est < decay_building il faut enlever le reste pour atteindre 0
 					if(centre_enfouissement.capacite>=(batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[1,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i])) and centre_enfouissement.info_acteur[i+8]="1"){
-					centre_enfouissement.materiaux[0,i]<-centre_enfouissement.materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+				
+					centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+batiment.materiaux[0,i]*note_ordre[8,i];
+					centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+batiment.materiaux[0,i]*note_ordre[9,i];
+					centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+batiment.materiaux[0,i]*note_ordre[10,i];
+					centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+batiment.materiaux[0,i]*note_ordre[11,i];
+					
+					tot_stockage_ISDI<-tot_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
+					tot_stockage_ISDND<-tot_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
+					tot_stockage_ISDI<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+					tot_autre_elimination<-tot_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					total_capacite3<-total_capacite3-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					som_cout<-som_cout+cout_ordre[2,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -824,7 +1010,16 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
 							if(list_enfouissement[j].capacite>=batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]) and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
-								list_enfouissement[j].materiaux[0,i]<-list_enfouissement[j].materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+							
+								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+batiment.materiaux[0,i]*note_ordre[8,i];
+								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+batiment.materiaux[0,i]*note_ordre[9,i];
+								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+batiment.materiaux[0,i]*note_ordre[10,i];
+								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+batiment.materiaux[0,i]*note_ordre[11,i];
+								
+								tot_stockage_ISDI<-tot_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
+								tot_stockage_ISDND<-tot_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
+								tot_stockage_ISDI<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+								tot_autre_elimination<-tot_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								total_capacite<-total_capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								som_cout<-som_cout+cout_ordre[0,i]*batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -837,7 +1032,10 @@ species people skills:[moving]{ // Unité opérative
 					}
 					
 					if(centre_trie.capacite>=(batiment.materiaux[0,i]*note_ordre[4,i])and centre_trie.info_acteur[i+8]="1"){
-						centre_trie.materiaux[0,i]<-centre_trie.materiaux[0,i]+batiment.materiaux[0,i]*note_ordre[4,i];
+						
+						centre_trie.envoi_tri[i]<-centre_trie.envoi_tri[i]+batiment.materiaux[0,i]*note_ordre[4,i];
+						
+						tot_envoi_tri<-tot_envoi_tri+batiment.materiaux[0,i]*note_ordre[4,i];
 						centre_trie.capacite<-centre_trie.capacite-batiment.materiaux[0,i]*note_ordre[4,i];
 						total_capacite<-total_capacite-batiment.materiaux[0,i]*note_ordre[4,i];
 						som_cout<-som_cout+cout_ordre[0,i]*batiment.materiaux[0,i]*note_ordre[4,i];
@@ -845,7 +1043,10 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de tri le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_traitement)-1{
 							if(list_traitement[j].capacite>=batiment.materiaux[0,i]*note_ordre[4,i] and list_traitement[j].info_acteur[i+8]="1" and find_new_centre=false){
-								list_traitement[j].materiaux[0,i]<-list_traitement[j].materiaux[0,i]+batiment.materiaux[0,i]*note_ordre[4,i];
+								
+								list_traitement[j].envoi_tri[i]<-list_traitement[j].envoi_tri[i]+batiment.materiaux[0,i]*note_ordre[4,i];
+								
+								tot_envoi_tri<-tot_envoi_tri+batiment.materiaux[0,i]*note_ordre[4,i];
 								list_traitement[j].capacite<-list_traitement[j].capacite-batiment.materiaux[0,i]*note_ordre[4,i];
 								total_capacite<-total_capacite-batiment.materiaux[0,i]*note_ordre[4,i];
 								som_cout<-som_cout+cout_ordre[0,i]*batiment.materiaux[0,i]*note_ordre[4,i];
@@ -855,7 +1056,16 @@ species people skills:[moving]{ // Unité opérative
 					}
 					
 					if(centre_reemploi.capacite>=(batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]))and centre_reemploi.info_acteur[i+8]="1"){
-						centre_reemploi.materiaux[0,i]<-centre_reemploi.materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						
+						centre_reemploi.reemploi_site[i]<-centre_reemploi.reemploi_site[i]+batiment.materiaux[0,i]*note_ordre[0,i];
+						centre_reemploi.reutilisation_site[i]<-centre_reemploi.reutilisation_site[i]+batiment.materiaux[0,i]*note_ordre[1,i];
+						centre_reemploi.reemploi_hors_site[i]<-centre_reemploi.reemploi_hors_site[i]+batiment.materiaux[0,i]*note_ordre[2,i];
+						centre_reemploi.reutilisation_hors_site[i]<-centre_reemploi.reutilisation_hors_site[i]+batiment.materiaux[0,i]*note_ordre[3,i];
+						
+						tot_reemploi_site<-tot_reemploi_site+batiment.materiaux[0,i]*note_ordre[0,i];
+						tot_reutilisation_site<-tot_reutilisation_site+batiment.materiaux[0,i]*note_ordre[1,i];
+						tot_reemploi_hors_site<-tot_reemploi_hors_site+batiment.materiaux[0,i]*note_ordre[2,i];
+						tot_reutilisation_hors_site<-tot_reutilisation_hors_site+batiment.materiaux[0,i]*note_ordre[3,i];
 						centre_reemploi.capacite<-centre_reemploi.capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						total_capacite4<-total_capacite4-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 						som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -866,7 +1076,16 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
 							if(list_reemploi[j].capacite>=batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_acteur[i+8]="1" and find_new_reemploi=false){
-								list_reemploi[j].materiaux[0,i]<-list_reemploi[j].materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								
+								list_reemploi[j].reemploi_site[i]<-list_reemploi[j].reemploi_site[i]+batiment.materiaux[0,i]*note_ordre[0,i];
+								list_reemploi[j].reutilisation_site[i]<-list_reemploi[j].reutilisation_site[i]+batiment.materiaux[0,i]*note_ordre[1,i];
+								list_reemploi[j].reemploi_hors_site[i]<-list_reemploi[j].reemploi_hors_site[i]+batiment.materiaux[0,i]*note_ordre[2,i];
+								list_reemploi[j].reutilisation_hors_site[i]<-list_reemploi[j].reutilisation_hors_site[i]+batiment.materiaux[0,i]*note_ordre[3,i];
+								
+								tot_reemploi_site<-tot_reemploi_site+batiment.materiaux[0,i]*note_ordre[0,i];
+								tot_reutilisation_site<-tot_reutilisation_site+batiment.materiaux[0,i]*note_ordre[1,i];
+								tot_reemploi_hors_site<-tot_reemploi_hors_site+batiment.materiaux[0,i]*note_ordre[2,i];
+								tot_reutilisation_hors_site<-tot_reutilisation_hors_site+batiment.materiaux[0,i]*note_ordre[3,i];
 								list_reemploi[j].capacite<-list_reemploi[j].capacite-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								total_capacite4<-total_capacite4-batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								som_cout<-som_cout+cout_ordre[1,i]*batiment.materiaux[0,i]*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
@@ -879,7 +1098,14 @@ species people skills:[moving]{ // Unité opérative
 					}
 					
 					if(centre_val.capacite>=(batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]))and centre_val.info_acteur[i+8]="1"){
-						centre_val.materiaux[0,i]<-centre_val.materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						
+						centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+batiment.materiaux[0,i]*note_ordre[5,i];
+						centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+batiment.materiaux[0,i]*note_ordre[6,i];
+						centre_val.REP[i]<-centre_val.REP[i]+batiment.materiaux[0,i]*note_ordre[7,i];
+						
+						tot_valo_matiere<-tot_valo_matiere+batiment.materiaux[0,i]*note_ordre[5,i];
+						tot_valo_energetique<-tot_valo_energetique+batiment.materiaux[0,i]*note_ordre[6,i];
+						tot_REP<-tot_REP+batiment.materiaux[0,i]*note_ordre[7,i];
 						centre_val.capacite<-centre_val.capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 						som_cout<-som_cout+cout_ordre[3,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -890,7 +1116,14 @@ species people skills:[moving]{ // Unité opérative
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
 							if(list_valo[j].capacite>=batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and find_new_centre_valo=false){
-								list_valo[j].materiaux[0,i]<-list_valo[j].materiaux[0,i]+batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								
+								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+batiment.materiaux[0,i]*note_ordre[5,i];
+								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+batiment.materiaux[0,i]*note_ordre[6,i];
+								list_valo[j].REP[i]<-list_valo[j].REP[i]+batiment.materiaux[0,i]*note_ordre[7,i];
+								
+								tot_valo_matiere<-tot_valo_matiere+batiment.materiaux[0,i]*note_ordre[5,i];
+								tot_valo_energetique<-tot_valo_energetique+batiment.materiaux[0,i]*note_ordre[6,i];
+								tot_REP<-tot_REP+batiment.materiaux[0,i]*note_ordre[7,i];
 								list_valo[j].capacite<-list_valo[j].capacite-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								total_capacite2<-total_capacite2-batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								som_cout<-som_cout+cout_ordre[3,i]*batiment.materiaux[0,i]*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
@@ -926,8 +1159,9 @@ species people skills:[moving]{ // Unité opérative
 		list_bat<-list(deconstruction);
 		depart<-false;
 		loop while:find_new_deconstruction=false{
-			batiment<-one_of(list_bat);
-			if( batiment.nb_employe<=20 and (batiment.entreprise_principale=entreprise_demolition or batiment.entreprise_principale=nil)){
+			//batiment<-one_of(list_bat);
+			batiment<-deconstruction(15);
+			if( batiment.deconstruction=false){
 				the_target<-any_location_in(batiment);
 				write name;
 				write batiment.name;
@@ -975,7 +1209,7 @@ species people skills:[moving]{ // Unité opérative
 			loop i from:0 to: length(list_traitement)-1{ // On classe  la liste des centre de tri par ordre croissant de distance
 				loop j from:0 to: length(list_traitement)-1{
 					if(distance[i]=tmp_dist[j]){
-						list_traitement[i]<-tmp_centre[j];
+						list_traitement[i]<-tri(tmp_centre[j]);
 					}
 				}
 			}
@@ -984,7 +1218,7 @@ species people skills:[moving]{ // Unité opérative
 			distance_enfouissement<-distance_enfouissement sort_by (each); // On classe par ordre croissant les distances
 			loop i from:0 to: length(list_enfouissement)-1{ // On prend le centre de stockage le plus proche
 					if(distance_enfouissement[0]=tmp_dist[i]){
-						centre_enfouissement<-tmp_centre[i];
+						centre_enfouissement<-enfouissement(tmp_centre[i]);
 					}
 				
 			}
@@ -994,7 +1228,7 @@ species people skills:[moving]{ // Unité opérative
 			loop i from:0 to: length(list_valo)-1{ // On classe  la liste des centre de valorisation par ordre croissant de distance
 				loop j from:0 to: length(list_valo)-1{
 					if(distance_valo[i]=tmp_dist[j]){
-						list_valo[i]<-tmp_centre[j];
+						list_valo[i]<-valorisation(tmp_centre[j]);
 					}
 				}
 			}
@@ -1004,7 +1238,7 @@ species people skills:[moving]{ // Unité opérative
 			loop i from:0 to: length(list_reemploi)-1{ // On classe  la liste des centre de reemploi par ordre croissant de distance
 				loop j from:0 to: length(list_reemploi)-1{
 					if(distance_reemploi[i]=tmp_dist[j]){
-						list_reemploi[i]<-tmp_centre[j];
+						list_reemploi[i]<-reemploi(tmp_centre[j]);
 					}
 				}
 			}
@@ -1049,7 +1283,7 @@ experiment RECONVERT type: gui {
 				data "tri" value:(1-(total_capacite/init_tot_capacite))*100 color:#red;
 				data "valo" value:(1-(total_capacite2/init_tot_capacite2))*100 color:#blue;
 				data "stock" value:(1-(total_capacite3/init_tot_capacite3))*100 color:#green;
-				data "reemploi" value:(1-(total_capacite4/init_tot_capacite4))*100 color:#yellow;
+				data "reemploi" value:(1-(total_capacite4/init_tot_capacite4))*100 color:#black;
 			}
 		}
 		
@@ -1058,8 +1292,35 @@ experiment RECONVERT type: gui {
 				data "Gain en €" value:som_cout color:#red;
 				data "Gain en eau(m³/t)" value:som_env_eau color:#blue;
 				data "Gain en energie(MJ/t)" value:som_env_energie color:#green;
-				data "Gain en CO2(t CO2 eq/t)" value:som_env_co2 color:#yellow;
+				data "Gain en CO2(t CO2 eq/t)" value:som_env_co2 color:#black;
 			}
+		}
+		
+		display MAT_SORTIE refresh:every(5#cycles){
+			chart "Nombre de tonnes évacuée dans les centre de tri" type:series size:{1,0.5} position:{0,0}{
+				data "tri" value:tot_envoi_tri color:#red;	
+			}
+			chart "Nombre de tonnes évacuée dans les centre d'enfouissement" type:series size:{1,0.5} position:{0,0.5}{
+				data "Stockage ISDI" value:tot_stockage_ISDI color:#red;
+				data "Stockage ISDND" value:tot_stockage_ISDND color:#blue;
+				data "Stockage ISDD" value:tot_stockage_ISDD color:#green;
+				data "Autre filière d'elimination" value:tot_envoi_tri color:#black;
+			}
+			
+		}
+		display MAT_SORTIE2 refresh:every(5#cycles){
+			chart "Nombre de tonnes évacuée dans les centre de valorisation" type:series size:{1,0.5} position:{0,0}{
+				data "Valorisation matière" value:tot_valo_matiere color:#red;
+				data "Valorisation energétique" value:tot_valo_energetique color:#blue;
+				data "REP" value:tot_REP color:#green;
+			}
+			chart "Nombre de tonnes évacuée dans les centre de reemploi" type:series size:{1,0.5} position:{0,0.5}{
+				data "Réemploi sur site" value:tot_reemploi_site color:#red;
+				data "Réemploi hors site" value:tot_reemploi_hors_site color:#blue;
+				data "Réutilisation sur site" value:tot_reutilisation_site color:#green;
+				data "Réutilisation hors site" value:tot_reutilisation_hors_site color:#black;
+			}
+			
 		}
 		
 		monitor "Number of building" value: nb_building;
