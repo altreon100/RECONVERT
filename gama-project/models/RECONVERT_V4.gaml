@@ -30,6 +30,7 @@ global {
 	file csv_enfouissement<-csv_file("../includes/013enfouissement.csv"); //Fichier contenant la liste des entreprises classées "enfouissement"
 	file csv_valorisation<-csv_file("../includes/014valorisation.csv"); //Fichier contenant la liste des entreprises classées "valorisation"
 	file csv_demolition<-csv_file("../includes/015demolition.csv"); //Fichier contenant la liste des entreprises de demolition
+	file csv_delais<-csv_file("../includes/016delais.csv"); //Fichier contenant la capacité des entreprises de deconstruction par matériaux
 	file couts_env<-csv_file("../includes/017ENV2.csv"); // Fichier des coûts environnementaux en fonction  du matériaux choisi
 	geometry shape <- envelope(shape_file_bounds); //Limite à la zone simulée 
 	
@@ -42,6 +43,7 @@ global {
 	float init_tot_capacite2<-0.0;
 	float init_tot_capacite3<-0.0;
 	float init_tot_capacite4<-0.0;
+	// variable calculant les couts/tonnes cummulées
 	float som_cout<-0.0; // Calcul le coûts en € de la déconstruction des bâtiments
 	float som_env_eau<-0.0; // Calcul le coûts en eau  de la déconstruction des bâtiments 
 	float som_env_co2<-0.0; // Calcul le coûts en CO2  de la déconstruction des bâtiments 
@@ -58,6 +60,7 @@ global {
 	float som_stockage_ISDND<-0.0;
 	float som_stockage_ISDD<-0.0;
 	float som_autre_elimination<-0.0;
+	//variable calculant les couts/tonnes à l'instant donné
 	float tot_cout<-0.0; 
 	float tot_env_eau<-0.0; 
 	float tot_env_co2<-0.0;  
@@ -86,7 +89,7 @@ global {
 	int note<-0;
 	float tot_materiaux<-0.0;
 	
-	//Matrice résultante du classement des matériaux
+	//Matrice résultante du classement des matériaux en fonction de leur ordre de sorti
 	matrix<float> note_ordre<-nil; 
 	matrix<float> cout_ordre<-nil;
 	matrix<float> env_ordre<-nil;
@@ -97,6 +100,7 @@ global {
 	matrix<string> reemploi_ordre<-nil;
 	matrix<string> tri_ordre<-nil;
 	matrix<string> demolition_ordre<-nil;
+	list<float> delais_ordre<-nil;
 	
 	//VARIABLE POUVANT ETRE MODIFIE
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
@@ -189,6 +193,13 @@ global {
 			matrix_capacite[39,i]<-copy_between(matrix_capacite[39,i],0,length(matrix_capacite[39,i])-1);
 		}
 		
+		matrix<string>matrix_delais<-matrix(csv_delais);
+		
+		loop i from: 0 to: matrix_delais.rows -1{
+			matrix_delais[0,i]<-copy_between(matrix_delais[0,i],1,length(matrix_delais[0,i]));
+			matrix_delais[2,i]<-copy_between(matrix_delais[2,i],0,length(matrix_delais[2,i])-1);
+		}
+		
 		point size<-point([1,matrix_ordre.rows]); 
 		int nb<-0;
 		loop i from: 1 to: 8{// On ordonne le fichier par ordre de sorti
@@ -212,7 +223,7 @@ global {
 		tri_ordre<-copy(matrix_tri);
 		matrix_tissus<-transpose(matrix_tissus);
 		tissus_ordre<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-2),0.0);
-
+		delais_ordre<-list_with(matrix_delais.rows,0.0);
 		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages du tableau et les capacités
 				loop j from:0 to:matrix_note.columns-1{
 					if(matrix_note[i,1]=matrix_ordre[1,j]){
@@ -255,9 +266,17 @@ global {
 							demolition_ordre[j+8,r]<-matrix_demolition[i+8,r];
 							
 						}
+							
+						delais_ordre[j]<-float(matrix_delais[2,i]);
+							
 					}	
 				}
 		
+		}
+		loop i from: 0 to: length(delais_ordre) - 1 {
+			
+				write "The element at row: " +i + " of the matrix is: " + delais_ordre[i];				
+			
 		}
 		note_ordre<-transpose(note_ordre);
 		tissus_ordre<-transpose(tissus_ordre);
@@ -1528,7 +1547,7 @@ experiment RECONVERT type: gui {
 		monitor "Nombre d'entreprise de demolition" value: nb_demolition;
 		monitor "Nombre de centre de valorisation" value: nb_valo;
 	}
-	reflex test{
+	reflex RAZ{
 		tot_envoi_tri<-0.0;
 		tot_cout<-0.0;
 		tot_env_eau<-0.0;
@@ -1545,5 +1564,8 @@ experiment RECONVERT type: gui {
 		tot_reemploi_hors_site<-0.0;
 		tot_reutilisation_site<-0.0;
 		tot_reutilisation_hors_site<-0.0;
+	}
+	reflex save{
+		save [som_cout,som_env_eau,som_env_energie,som_env_co2,som_envoi_tri,som_stockage_ISDI,som_stockage_ISDND,som_stockage_ISDD,som_autre_elimination,som_valo_matiere,som_valo_energetique,som_REP,som_reemploi_site,som_reemploi_hors_site,som_reutilisation_site,som_reutilisation_hors_site] to: "../Results/test.csv" type:"csv" rewrite: false;
 	}
 }
