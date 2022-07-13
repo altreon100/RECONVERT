@@ -107,6 +107,7 @@ global {
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
 	float decay_building<-60.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
 	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
+	float init_occupation<-4.0;
 	int nb_ouvrier<-20;
 	init {
 		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
@@ -273,11 +274,7 @@ global {
 				}
 		
 		}
-		loop i from: 0 to: length(delais_ordre) - 1 {
-			
-				write "The element at row: " +i + " of the matrix is: " + delais_ordre[i];				
-			
-		}
+		
 		note_ordre<-transpose(note_ordre);
 		tissus_ordre<-transpose(tissus_ordre);
 		
@@ -315,6 +312,14 @@ global {
 					stockage_ISDND<-list_with(note_ordre.rows,0.0);
 					stockage_ISDD<-list_with(note_ordre.rows,0.0);
 					autre_elimination<-list_with(note_ordre.rows,0.0);
+					loop i from:0 to:length(stockage_ISDND)-1{
+						stockage_ISDI[i]<-rnd(init_occupation);
+						stockage_ISDND[i]<-rnd(init_occupation);
+						stockage_ISDD[i]<-rnd(init_occupation);
+						autre_elimination[i]<-rnd(init_occupation);
+						total_capacite3<-total_capacite3-(stockage_ISDI[i]+stockage_ISDND[i]+stockage_ISDD[i]+autre_elimination[i]);
+						capacite<-capacite-(stockage_ISDI[i]+stockage_ISDND[i]+stockage_ISDD[i]+autre_elimination[i]);
+					}
 					info_acteur<-list_with(matrix_enfouissement.columns,"0");
 					info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 					loop i from:0 to:enfouissement_ordre.columns-1{ // Pour chaque centre d'enfouissement on récupère les infos de la matrice
@@ -333,13 +338,20 @@ global {
 						
 		}
 		create valorisation from: shape_file_valo{ //création des centres de valorisation
-			capacite<-60.0;
+			capacite<-500.0;
 			total_capacite2<-total_capacite2+capacite;
 			init_tot_capacite2<-init_tot_capacite2+capacite;
 			nb_valo<-nb_valo+1;
 			valo_matiere<-list_with(note_ordre.rows,0.0);
 			valo_energetique<-list_with(note_ordre.rows,0.0);
 			REP<-list_with(note_ordre.rows,0.0);
+			loop i from:0 to:length(REP)-1{
+				valo_matiere[i]<-rnd(1.0);
+				valo_energetique[i]<-rnd(1.0);
+				REP[i]<-rnd(1.0);
+				total_capacite2<-total_capacite2-(valo_matiere[i]+valo_energetique[i]+REP[i]);
+				capacite<-capacite-(valo_matiere[i]+valo_energetique[i]+REP[i]);
+			}
 			info_acteur<-list_with(matrix_valorisation.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
 			loop i from:0 to:valorisation_ordre.columns-1{ // Pour chaque valorisation on récupère les infos de la matrice
@@ -359,11 +371,16 @@ global {
 		}
 		
 		create tri from:shape_file_tri{ // creation des centres de tri
-			capacite<-600.0;
+			capacite<-900.0;
 			total_capacite<-total_capacite+capacite;
 			init_tot_capacite<-init_tot_capacite+capacite;
 			nb_tri<-nb_tri+1;
 			envoi_tri<-list_with(note_ordre.rows,0.0);
+			loop i from:0 to:length(envoi_tri)-1{
+				envoi_tri[i]<-rnd(init_occupation);
+				total_capacite<-total_capacite-envoi_tri[i];
+				capacite<-capacite-envoi_tri[i];
+			}
 			list_enfouissement<-list(enfouissement);
 			list_valo<-list(valorisation);
 			distance_enfouissement<-list_with(length(enfouissement),0.0);
@@ -419,13 +436,21 @@ global {
 			
 		}
 		create reemploi from:shape_file_reemploi{ // création des centres de réemploi
-			capacite<-100.0;
+			capacite<-400.0;
 			total_capacite4<-total_capacite4+capacite;
 			init_tot_capacite4<-init_tot_capacite4+capacite;
 			reemploi_site<-list_with(note_ordre.rows,0.0);
 			reemploi_hors_site<-list_with(note_ordre.rows,0.0);
 			reutilisation_site<-list_with(note_ordre.rows,0.0);
 			reutilisation_hors_site<-list_with(note_ordre.rows,0.0);
+			loop i from:0 to:length(reemploi_site)-1{
+						reemploi_site[i]<-rnd(0.5);
+						reemploi_hors_site[i]<-rnd(0.5);
+						reutilisation_site[i]<-rnd(0.5);
+						reutilisation_hors_site[i]<-rnd(0.5);
+						total_capacite4<-total_capacite4-(reemploi_site[i]+reemploi_hors_site[i]+reutilisation_site[i]+reutilisation_hors_site[i]);
+						capacite<-capacite-(reemploi_site[i]+reemploi_hors_site[i]+reutilisation_site[i]+reutilisation_hors_site[i]);
+					}
 			nb_reemploi<-nb_reemploi+1;
 			info_acteur<-list_with(matrix_reemploi.columns,"0");
 			info_capacite<-list_with(capacite_ordre.columns-2,0.0);
