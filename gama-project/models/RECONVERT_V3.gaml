@@ -80,7 +80,7 @@ global {
 		
 		
 		matrix<string> copy_mat<-copy(matrix_ordre);
-		matrix<string> matrix_note<-matrix(note1);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
+		matrix<string> matrix_note<-matrix(note0);// IL FAUT CHANGER LE NOMBRE  "matrix(note*)" POUR CHANGER LE FICHIER LU 
 		
 		loop i from: 0 to: matrix_note.rows -1{
 			matrix_note[0,i]<-copy_between(matrix_note[0,i],1,length(matrix_note[0,i]));
@@ -1017,7 +1017,7 @@ experiment RECONVERT type: gui {
 			species reemploi aspect:base;
 			species entreprise_deconstruction aspect:base;
 			species people aspect: base;
-			//species building aspect:base;
+			species building aspect:base;
 		}
 		
 		display OCCUPATION refresh:every(5#cycles){
