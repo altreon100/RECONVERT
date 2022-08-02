@@ -1,7 +1,6 @@
 
 model RECONVERTV2
 
-
 global {
 	file shape_file_buildings <- file("../includes/lille.shp"); // Fichier shape contenant les bâtiments de la zone à étudier
 	file shape_file_bounds <- file("../includes/bounds.shp"); //Fichier shape d'un rectangle contenant la zone choisi
