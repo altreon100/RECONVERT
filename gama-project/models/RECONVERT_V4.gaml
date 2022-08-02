@@ -1,10 +1,8 @@
 
-
-
 model RECONVERTV4
 
 global {
-	file shape_file_buildings <- file("../includes/permis de démolir.shp"); // Fichier shape contenant les bâtiments à déconstruire
+	file shape_file_buildings <- file("../includes/Permis de demolir par tissu_2020-2021.shp"); // Fichier shape contenant les bâtiments à déconstruire
 	file shape_file_bounds <- file("../includes/Contiurs simple MEL.shp"); //Fichier shape du périmètre de la zone choisi
 	file shape_file_tri <- file("../includes/Centre de tri.shp"); //Fichier shape avec les centres de tri
 	file shape_file_enfouissement <- file("../includes/Enfouissement.shp"); //Fichier shape avec les zones d'enfouissement
@@ -37,7 +35,7 @@ global {
 	//Variables utilisées pour le monitoring
 	float total_capacite<-0.0;// Permet de calculer le taux d'occupation des centres de tri
 	float total_capacite2<-0.0; // Permet de calculer le taux d'occupation des centres de valo
-	float total_capacite3<-0.0; // Permet de calculer le taux d'occupation des centres de stockage
+	float total_capacite3<-0.0; // Permet de calculer le taux d'occupation des centres d'enfouissement
 	float total_capacite4<-0.0; // Permet de calculer le taux d'occupation des centres de reemploi
 	float init_tot_capacite<-0.0;
 	float init_tot_capacite2<-0.0;
@@ -97,7 +95,7 @@ global {
 	matrix<float> cout_ordre<-nil;
 	matrix<float> env_ordre<-nil;
 	matrix<string> capacite_ordre<-nil;
-	matrix<float> tissus_ordre<-nil;
+	matrix<string> tissus_ordre<-nil;
 	matrix<string> enfouissement_ordre<-nil;
 	matrix<string> valorisation_ordre<-nil;
 	matrix<string> reemploi_ordre<-nil;
@@ -107,11 +105,12 @@ global {
 	
 	//VARIABLE POUVANT ETRE MODIFIE
 	float step <- 0.5#day; //correspond au temps entre chaque cycle
+	int calcul_step<-0;
 	float pourcentage_tri<-0.7; // Pourcentage du nombre de tonne envoyé du centre de tri vers le centre de stockage/valorisation
-	float decay_building<-60.0; //nombre de tonne de matériaux déconstruit à chaque step (influ sur la vitesse de la déconstruction et sur le taux d'occupation des centres)
 	int nb_heure<-4; // Règle le nombre d'heure de travail éffectué par step (ici step=0.5 day donc 4h de travail)
 	float init_occupation<-4.0;
 	int nb_ouvrier<-20;
+	
 	init {
 		// On récupère les tableau  et on enlève les "" propre aux fichiers CSV
 		matrix<string> matrix_ordre <- matrix(ordre_mat); 
@@ -163,11 +162,22 @@ global {
 		}*/
 		matrix<string> matrix_tissus<-matrix(tissus);
 		
-		loop i from: 0 to: matrix_tissus.rows -1{
+		loop i from:1 to: matrix_tissus.rows -1{
 			matrix_tissus[0,i]<-copy_between(matrix_tissus[0,i],1,length(matrix_tissus[0,i]));
 			matrix_tissus[11,i]<-copy_between(matrix_tissus[11,i],0,length(matrix_tissus[11,i])-1);
 		}
 		
+		matrix<string> matrix_tissus2<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-1),"0.0");
+		loop i from: 0 to: matrix_tissus2.rows - 1 {
+			loop j from: 0 to: matrix_tissus2.columns - 1 {
+				matrix_tissus2[j,i]<-matrix_tissus[j,i+1];			
+			}
+		}
+		/*loop i from: 0 to: matrix_tissus2.rows - 1 {
+			loop j from: 0 to: matrix_tissus2.columns - 1 {
+				write "The element at row: " +i + " and column: " + j + " of the matrix is: " + matrix_tissus2[j,i];				
+			}
+		}*/
 		matrix<string> matrix_reemploi<-matrix(remploi);
 		matrix<string>matrix_tri<-matrix(csv_tri);
 		matrix<string>matrix_enfouissement<-matrix(csv_enfouissement);
@@ -224,8 +234,11 @@ global {
 		reemploi_ordre<-copy(matrix_reemploi);
 		demolition_ordre<-copy(matrix_demolition);
 		tri_ordre<-copy(matrix_tri);
-		matrix_tissus<-transpose(matrix_tissus);
-		tissus_ordre<-matrix_with(point(matrix_tissus.columns,matrix_tissus.rows-2),0.0);
+		matrix_tissus2<-transpose(matrix_tissus2);
+		tissus_ordre<-matrix_with(point(matrix_tissus2.columns,matrix_tissus2.rows-2),"0.0");
+		loop i from:0 to:tissus_ordre.rows-1{
+			tissus_ordre[0,i]<-matrix_tissus2[0,i+2];
+		}
 		delais_ordre<-list_with(matrix_delais.rows,0.0);
 		loop i from: 0 to: matrix_note.columns-1{ // On ordonne en fonction de l'ordre de sorti les pourcentages du tableau et les capacités
 			loop j from:0 to:matrix_note.columns-1{
@@ -238,8 +251,8 @@ global {
 						capacite_ordre[j+2,l]<-matrix_capacite[i+2,l];
 					}
 						
-					loop m from:0 to: matrix_tissus.rows-1{
-						tissus_ordre[j,m-2]<-float(matrix_tissus[i,m]);
+					loop m from:2 to: matrix_tissus2.rows-1{
+						tissus_ordre[j+1,m-2]<-(matrix_tissus2[i+1,m]);
 					}
 						
 					loop n from:0 to: matrix_enfouissement.rows-1{
@@ -270,7 +283,11 @@ global {
 		
 		note_ordre<-transpose(note_ordre);
 		tissus_ordre<-transpose(tissus_ordre);
-		
+		/*loop i from: 0 to: tissus_ordre.rows - 1 {
+			loop j from: 0 to: tissus_ordre.columns - 1 {
+				write "The element at row: " +i + " and column: " + j + " of the matrix is: " + tissus_ordre[j,i];				
+			}
+		}*/
 		matrix_cout<-transpose(matrix_cout);
 		point size3<-point([matrix_cout.columns,4]);
 		cout_ordre<-matrix_with(size3,0.0);
@@ -505,6 +522,7 @@ global {
 			nb_employe<-int(info_acteur[2]);
 			code_APE<-info_acteur[3];
 			
+			
 			loop i from:0 to:capacite_ordre.rows-1{ // On récupère la bonne ligne de la matrice capacité en regardant son code APE
 				if(capacite_ordre[1,i] contains (code_APE)){
 					loop j from:2 to: capacite_ordre.columns-1{
@@ -539,16 +557,20 @@ global {
 				}
 			}
 		}
-		create deconstruction from:shape_file_buildings with:[surface::float(read("Surfaces"))]{ // création des bâtiments à déconstruire
+		create deconstruction number:20 from:shape_file_buildings with:[surface::float(read("J2-Surface")),tissus_bat::string(read("Typo_nom"))]{ // création des bâtiments à déconstruire  
+			//create deconstruction from:shape_file_buildings with:[surface::float(read("Surfaces")),tissus_bat::string(read("Typo_nom"))]{ //pour les 271 bâtiments
 			id_building<-id+1;
 			id<-id+1;
 			nb_building<-nb_building+1;
 			nb_contrat<-nb_contrat+1;
 			materiaux<-matrix_with(size,0.0);
-			
-			loop i from:0 to:materiaux.rows-1{ // On affecte pour chaque matériaux et pour chaque bâtiment un nombre de tonne en fonction de sq surface
-				materiaux[0,i]<-surface*tissus_ordre[9,i];
-				tot_materiaux<-tot_materiaux+materiaux[0,i];
+			loop i from: 0 to: tissus_ordre.columns-1{ 
+				if(tissus_ordre[i,0]=tissus_bat){
+					loop j from:0 to: materiaux.rows-1{
+						materiaux[0,j]<-surface*float(tissus_ordre[i,j+1]);
+						tot_materiaux<-tot_materiaux+materiaux[0,j];
+					}
+				}
 			}
 		}
 		/*create people number:1{
@@ -556,7 +578,6 @@ global {
 			entreprise_demolition<-entreprise_deconstruction[0];
 			nb_employe<-20;
 		}*/
-		save [som_cout,som_env_eau,som_env_energie,som_env_co2,som_envoi_tri,som_stockage_ISDI,som_stockage_ISDND,som_stockage_ISDD,som_autre_elimination,som_valo_matiere,som_valo_energetique,som_REP,som_reemploi_site,som_reemploi_hors_site,som_reutilisation_site,som_reutilisation_hors_site] to: "../Results/test.csv" type:"csv" rewrite: true;
 		
 	}
 }
@@ -572,9 +593,6 @@ species building {
 	int nb_employe<-0; // Correspond aux nombres d'employés salariés de l'acteur
 	string code_APE<-nil; // Correspond au Code APE de l'acteur
 	
-	reflex die when: color=#black{  // Si le bâtiment a finit d'être déconstruit on le tue
-		do die;
-	}
 	
 	aspect base {  
 		draw shape color: color ;
@@ -618,11 +636,11 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					
 					som_stockage_ISDI<-som_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					som_stockage_ISDND<-som_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
-					som_stockage_ISDI<-som_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					som_stockage_ISDD<-som_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					som_autre_elimination<-som_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
-					tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+					tot_stockage_ISDD<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 					total_capacite3<-total_capacite3-pourcentage_tri*info_capacite[i]*nb_heure;
@@ -646,11 +664,11 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								
 							som_stockage_ISDI<-som_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							som_stockage_ISDND<-som_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
-							som_stockage_ISDI<-som_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+							som_stockage_ISDD<-som_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							som_autre_elimination<-som_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
-							tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
+							tot_stockage_ISDD<-tot_stockage_ISDD+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*info_capacite[i]*nb_heure)/4.0;
 							list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*info_capacite[i]*nb_heure;
 							total_capacite<-total_capacite-pourcentage_tri*info_capacite[i]*nb_heure;
@@ -734,11 +752,11 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 					
 					som_stockage_ISDI<-som_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
 					som_stockage_ISDND<-som_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
-					som_stockage_ISDI<-som_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+					som_stockage_ISDD<-som_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
 					som_autre_elimination<-som_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
 					tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
 					tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
-					tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+					tot_stockage_ISDD<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
 					tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
 					centre_enfouissement.capacite<-centre_enfouissement.capacite-pourcentage_tri*envoi_tri[i];
 					total_capacite3<-total_capacite3-pourcentage_tri*envoi_tri[i];
@@ -762,11 +780,11 @@ species tri parent:building {  // les centres de tri vont disparaître une certa
 								
 							som_stockage_ISDI<-som_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
 							som_stockage_ISDND<-som_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
-							som_stockage_ISDI<-som_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+							som_stockage_ISDD<-som_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
 							som_autre_elimination<-som_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
 							tot_stockage_ISDI<-tot_stockage_ISDI+(pourcentage_tri*envoi_tri[i])/4.0;
 							tot_stockage_ISDND<-tot_stockage_ISDND+(pourcentage_tri*envoi_tri[i])/4.0;
-							tot_stockage_ISDI<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
+							tot_stockage_ISDD<-tot_stockage_ISDD+(pourcentage_tri*envoi_tri[i])/4.0;
 							tot_autre_elimination<-tot_autre_elimination+(pourcentage_tri*envoi_tri[i])/4.0;
 							list_enfouissement[j].capacite<-list_enfouissement[j].capacite-pourcentage_tri*envoi_tri[i];
 							total_capacite<-total_capacite-pourcentage_tri*envoi_tri[i];
@@ -939,6 +957,7 @@ species entreprise_deconstruction parent:building {
 species deconstruction parent:building { 
 	matrix<float>  materiaux<-nil; // liste de tous les matériaux existant
 	float surface;
+	string tissus_bat<-nil;
 	bool deconstruction<-false; // Si le bâtiment est en cours de déconstruction
 	entreprise_deconstruction entreprise_principale<-nil;
 	rgb color<-#blue;
@@ -949,6 +968,12 @@ species deconstruction parent:building {
 			mat_total<-mat_total+materiaux[0,i];
 		}
 	}
+	
+	reflex die when: color=#black{  // Si le bâtiment a finit d'être déconstruit on le tue
+		save[name,cycle] to: "../Results/batiment.csv" type:"csv" rewrite: false;
+		do die;
+	}
+	
 }
 
 species people skills:[moving]{ // Unité opérative
@@ -1009,208 +1034,208 @@ species people skills:[moving]{ // Unité opérative
 		loop i from:0 to:batiment.materiaux.rows -1{
 			if(batiment.materiaux[0,i]!=0.0 and sol=false){
 				sol<-true;
-				if (batiment.materiaux[0,i]>=decay_building){
-					batiment.materiaux[0,i]<-batiment.materiaux[0,i] -decay_building;
-					tot_materiaux<-tot_materiaux-decay_building;
+				if (batiment.materiaux[0,i]>=entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier){
+					batiment.materiaux[0,i]<-batiment.materiaux[0,i] -entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier;
+					tot_materiaux<-tot_materiaux-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier;
 					// On envoit une partie en enfouissement
-					if(centre_enfouissement.capacite>=(decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i])) and centre_enfouissement.info_acteur[i+8]="1"){
+					if(centre_enfouissement.capacite>=(entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i])) and centre_enfouissement.info_acteur[i+8]="1"){
 						
-						centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+decay_building*note_ordre[8,i];
-						centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+decay_building*note_ordre[9,i];
-						centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+decay_building*note_ordre[10,i];
-						centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+decay_building*note_ordre[11,i];
+						centre_enfouissement.stockage_ISDI[i]<-centre_enfouissement.stockage_ISDI[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+						centre_enfouissement.stockage_ISDND[i]<-centre_enfouissement.stockage_ISDND[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+						centre_enfouissement.stockage_ISDD[i]<-centre_enfouissement.stockage_ISDD[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+						centre_enfouissement.autre_elimination[i]<-centre_enfouissement.autre_elimination[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
 					
-						som_stockage_ISDI<-som_stockage_ISDI+decay_building*note_ordre[8,i];
-						som_stockage_ISDND<-som_stockage_ISDND+decay_building*note_ordre[9,i];
-						som_stockage_ISDI<-som_stockage_ISDD+decay_building*note_ordre[10,i];
-						som_autre_elimination<-som_autre_elimination+decay_building*note_ordre[11,i];
-						tot_stockage_ISDI<-tot_stockage_ISDI+decay_building*note_ordre[8,i];
-						tot_stockage_ISDND<-tot_stockage_ISDND+decay_building*note_ordre[9,i];
-						tot_stockage_ISDI<-tot_stockage_ISDD+decay_building*note_ordre[10,i];
-						tot_autre_elimination<-tot_autre_elimination+decay_building*note_ordre[11,i];
-						centre_enfouissement.capacite<-centre_enfouissement.capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						total_capacite3<-total_capacite3-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						som_cout<-som_cout+cout_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						som_env_eau<-som_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						som_env_energie<-som_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						som_env_co2<-som_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						tot_cout<-tot_cout+cout_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						tot_env_eau<-tot_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						tot_env_energie<-tot_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-						tot_env_co2<-tot_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						som_stockage_ISDI<-som_stockage_ISDI+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+						som_stockage_ISDND<-som_stockage_ISDND+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+						som_stockage_ISDD<-som_stockage_ISDD+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+						som_autre_elimination<-som_autre_elimination+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
+						tot_stockage_ISDI<-tot_stockage_ISDI+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+						tot_stockage_ISDND<-tot_stockage_ISDND+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+						tot_stockage_ISDD<-tot_stockage_ISDD+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+						tot_autre_elimination<-tot_autre_elimination+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
+						centre_enfouissement.capacite<-centre_enfouissement.capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						total_capacite3<-total_capacite3-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						som_cout<-som_cout+cout_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						som_env_eau<-som_env_eau-env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						som_env_energie<-som_env_energie-env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						som_env_co2<-som_env_co2-env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						tot_cout<-tot_cout+cout_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						tot_env_eau<-tot_env_eau-env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						tot_env_energie<-tot_env_energie-env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+						tot_env_co2<-tot_env_co2-env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 					}
 					
 					else{ // Si le centre d'enfouissement le plus proche n'a plus la capacité on va chercher le centre d'enfouissement le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_enfouissement)-1{
-							if(list_enfouissement[j].capacite>=decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]) and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
+							if(list_enfouissement[j].capacite>=entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]) and list_enfouissement[j].info_acteur[i+8]="1" and find_new_enfouissement=false){
 								
-								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+decay_building*note_ordre[8,i];
-								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+decay_building*note_ordre[9,i];
-								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+decay_building*note_ordre[10,i];
-								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+decay_building*note_ordre[11,i];
+								list_enfouissement[j].stockage_ISDI[i]<-list_enfouissement[j].stockage_ISDI[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+								list_enfouissement[j].stockage_ISDND[i]<-list_enfouissement[j].stockage_ISDND[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+								list_enfouissement[j].stockage_ISDD[i]<-list_enfouissement[j].stockage_ISDD[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+								list_enfouissement[j].autre_elimination[i]<-list_enfouissement[j].autre_elimination[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
 					
-								som_stockage_ISDI<-som_stockage_ISDI+decay_building*note_ordre[8,i];
-								som_stockage_ISDND<-som_stockage_ISDND+decay_building*note_ordre[9,i];
-								som_stockage_ISDI<-som_stockage_ISDD+decay_building*note_ordre[10,i];
-								som_autre_elimination<-som_autre_elimination+decay_building*note_ordre[11,i];
-								tot_stockage_ISDI<-tot_stockage_ISDI+decay_building*note_ordre[8,i];
-								tot_stockage_ISDND<-tot_stockage_ISDND+decay_building*note_ordre[9,i];
-								tot_stockage_ISDI<-tot_stockage_ISDD+decay_building*note_ordre[10,i];
-								tot_autre_elimination<-tot_autre_elimination+decay_building*note_ordre[11,i];
-								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								total_capacite<-total_capacite-decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								som_cout<-som_cout+cout_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								som_env_eau<-som_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								som_env_energie<-som_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								som_env_co2<-som_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								tot_cout<-tot_cout+cout_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								tot_env_eau<-tot_env_eau-env_ordre[0,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								tot_env_energie<-tot_env_energie-env_ordre[1,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
-								tot_env_co2<-tot_env_co2-env_ordre[2,i]*decay_building*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_stockage_ISDI<-som_stockage_ISDI+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+								som_stockage_ISDND<-som_stockage_ISDND+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+								som_stockage_ISDD<-som_stockage_ISDD+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+								som_autre_elimination<-som_autre_elimination+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
+								tot_stockage_ISDI<-tot_stockage_ISDI+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[8,i];
+								tot_stockage_ISDND<-tot_stockage_ISDND+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[9,i];
+								tot_stockage_ISDD<-tot_stockage_ISDD+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[10,i];
+								tot_autre_elimination<-tot_autre_elimination+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[11,i];
+								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								total_capacite<-total_capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_cout<-som_cout+cout_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_eau<-som_env_eau-env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_energie<-som_env_energie-env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								som_env_co2<-som_env_co2-env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								tot_cout<-tot_cout+cout_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								tot_env_eau<-tot_env_eau-env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								tot_env_energie<-tot_env_energie-env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
+								tot_env_co2<-tot_env_co2-env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								find_new_enfouissement<-true;
 							}
 						}
 					}
 					
 					// Un autre partie en centre de tri
-					if(centre_trie.capacite>=(decay_building*note_ordre[4,i])and centre_trie.info_acteur[i+8]="1" and centre_trie.info_capacite[i]!=0.0){
+					if(centre_trie.capacite>=(entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i])and centre_trie.info_acteur[i+8]="1" and centre_trie.info_capacite[i]!=0.0){
 						
-						centre_trie.envoi_tri[i]<-centre_trie.envoi_tri[i]+decay_building*note_ordre[4,i];
+						centre_trie.envoi_tri[i]<-centre_trie.envoi_tri[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
 						
-						tot_envoi_tri<-tot_envoi_tri+decay_building*note_ordre[4,i];
-						som_envoi_tri<-som_envoi_tri+decay_building*note_ordre[4,i];
-						centre_trie.capacite<-centre_trie.capacite-decay_building*note_ordre[4,i];
-						total_capacite<-total_capacite-decay_building*note_ordre[4,i];
-						som_cout<-som_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
-						tot_cout<-tot_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
+						tot_envoi_tri<-tot_envoi_tri+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+						som_envoi_tri<-som_envoi_tri+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+						centre_trie.capacite<-centre_trie.capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+						total_capacite<-total_capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+						som_cout<-som_cout+cout_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+						tot_cout<-tot_cout+cout_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
 					}
 					
 					else{ // Si le centre de tri le plus proche n'a plus la capacité on va chercher le centre de tri le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_traitement)-1{
-							if(list_traitement[j].capacite>=decay_building*note_ordre[4,i] and list_traitement[j].info_acteur[i+8]="1" and list_traitement[j].info_capacite[i]!=0.0 and find_new_centre=false){
+							if(list_traitement[j].capacite>=entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i] and list_traitement[j].info_acteur[i+8]="1" and list_traitement[j].info_capacite[i]!=0.0 and find_new_centre=false){
 								
-								list_traitement[j].envoi_tri[i]<-list_traitement[j].envoi_tri[i]+decay_building*note_ordre[4,i];
+								list_traitement[j].envoi_tri[i]<-list_traitement[j].envoi_tri[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
 								
-								tot_envoi_tri<-tot_envoi_tri+decay_building*note_ordre[4,i];
-								som_envoi_tri<-som_envoi_tri+decay_building*note_ordre[4,i];
-								list_traitement[j].capacite<-list_traitement[j].capacite-decay_building*note_ordre[4,i];
-								total_capacite<-total_capacite-decay_building*note_ordre[4,i];
-								som_cout<-som_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
-								tot_cout<-tot_cout+cout_ordre[0,i]*decay_building*note_ordre[4,i];
+								tot_envoi_tri<-tot_envoi_tri+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+								som_envoi_tri<-som_envoi_tri+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+								list_traitement[j].capacite<-list_traitement[j].capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+								total_capacite<-total_capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+								som_cout<-som_cout+cout_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
+								tot_cout<-tot_cout+cout_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[4,i];
 								find_new_centre<-true;
 							}
 						}
 					}
 					
 					// Ensuite les centres de réemploi
-					if(centre_reemploi.capacite>=(decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i])) and centre_reemploi.info_capacite[i]!=0.0 and centre_reemploi.info_acteur[i+8]="1"){
+					if(centre_reemploi.capacite>=(entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i])) and centre_reemploi.info_capacite[i]!=0.0 and centre_reemploi.info_acteur[i+8]="1"){
 						
-						centre_reemploi.reemploi_site[i]<-centre_reemploi.reemploi_site[i]+decay_building*note_ordre[0,i];
-						centre_reemploi.reutilisation_site[i]<-centre_reemploi.reutilisation_site[i]+decay_building*note_ordre[1,i];
-						centre_reemploi.reemploi_hors_site[i]<-centre_reemploi.reemploi_hors_site[i]+decay_building*note_ordre[2,i];
-						centre_reemploi.reutilisation_hors_site[i]<-centre_reemploi.reutilisation_hors_site[i]+decay_building*note_ordre[3,i];
+						centre_reemploi.reemploi_site[i]<-centre_reemploi.reemploi_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+						centre_reemploi.reutilisation_site[i]<-centre_reemploi.reutilisation_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+						centre_reemploi.reemploi_hors_site[i]<-centre_reemploi.reemploi_hors_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+						centre_reemploi.reutilisation_hors_site[i]<-centre_reemploi.reutilisation_hors_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
 						
-						som_reemploi_site<-som_reemploi_site+decay_building*note_ordre[0,i];
-						som_reutilisation_site<-som_reutilisation_site+decay_building*note_ordre[1,i];
-						som_reemploi_hors_site<-som_reemploi_hors_site+decay_building*note_ordre[2,i];
-						som_reutilisation_hors_site<-som_reutilisation_hors_site+decay_building*note_ordre[3,i];
-						tot_reemploi_site<-tot_reemploi_site+decay_building*note_ordre[0,i];
-						tot_reutilisation_site<-tot_reutilisation_site+decay_building*note_ordre[1,i];
-						tot_reemploi_hors_site<-tot_reemploi_hors_site+decay_building*note_ordre[2,i];
-						tot_reutilisation_hors_site<-tot_reutilisation_hors_site+decay_building*note_ordre[3,i];
-						centre_reemploi.capacite<-centre_reemploi.capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						tot_cout<-tot_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						tot_env_eau<-tot_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						tot_env_energie<-tot_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-						tot_env_co2<-tot_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_reemploi_site<-som_reemploi_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+						som_reutilisation_site<-som_reutilisation_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+						som_reemploi_hors_site<-som_reemploi_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+						som_reutilisation_hors_site<-som_reutilisation_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
+						tot_reemploi_site<-tot_reemploi_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+						tot_reutilisation_site<-tot_reutilisation_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+						tot_reemploi_hors_site<-tot_reemploi_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+						tot_reutilisation_hors_site<-tot_reutilisation_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
+						centre_reemploi.capacite<-centre_reemploi.capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						total_capacite4<-total_capacite4-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_cout<-som_cout+cout_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						tot_cout<-tot_cout+cout_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						tot_env_eau<-tot_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						tot_env_energie<-tot_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+						tot_env_co2<-tot_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 					}
 					
 					else{ // Si le centre de reemploi le plus proche n'a plus la capacité on va chercher le centre de reemploi le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_reemploi)-1{
-							if(list_reemploi[j].capacite>=decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_capacite[i]!=0.0 and list_reemploi[j].info_acteur[i+8]="1" and find_new_reemploi=false){
+							if(list_reemploi[j].capacite>=entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]) and list_reemploi[j].info_capacite[i]!=0.0 and list_reemploi[j].info_acteur[i+8]="1" and find_new_reemploi=false){
 								
-								list_reemploi[j].reemploi_site[i]<-list_reemploi[j].reemploi_site[i]+decay_building*note_ordre[0,i];
-								list_reemploi[j].reutilisation_site[i]<-list_reemploi[j].reutilisation_site[i]+decay_building*note_ordre[1,i];
-								list_reemploi[j].reemploi_hors_site[i]<-list_reemploi[j].reemploi_hors_site[i]+decay_building*note_ordre[2,i];
-								list_reemploi[j].reutilisation_hors_site[i]<-list_reemploi[j].reutilisation_hors_site[i]+decay_building*note_ordre[3,i];
+								list_reemploi[j].reemploi_site[i]<-list_reemploi[j].reemploi_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+								list_reemploi[j].reutilisation_site[i]<-list_reemploi[j].reutilisation_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+								list_reemploi[j].reemploi_hors_site[i]<-list_reemploi[j].reemploi_hors_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+								list_reemploi[j].reutilisation_hors_site[i]<-list_reemploi[j].reutilisation_hors_site[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
 								
-								som_reemploi_site<-som_reemploi_site+decay_building*note_ordre[0,i];
-								som_reutilisation_site<-som_reutilisation_site+decay_building*note_ordre[1,i];
-								som_reemploi_hors_site<-som_reemploi_hors_site+decay_building*note_ordre[2,i];
-								som_reutilisation_hors_site<-som_reutilisation_hors_site+decay_building*note_ordre[3,i];
-								tot_reemploi_site<-tot_reemploi_site+decay_building*note_ordre[0,i];
-								tot_reutilisation_site<-tot_reutilisation_site+decay_building*note_ordre[1,i];
-								tot_reemploi_hors_site<-tot_reemploi_hors_site+decay_building*note_ordre[2,i];
-								tot_reutilisation_hors_site<-tot_reutilisation_hors_site+decay_building*note_ordre[3,i];
-								list_reemploi[j].capacite<-list_reemploi[j].capacite-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								total_capacite4<-total_capacite4-decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								som_cout<-som_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								tot_cout<-tot_cout+cout_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								tot_env_eau<-tot_env_eau+env_ordre[0,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								tot_env_energie<-tot_env_energie+env_ordre[1,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
-								tot_env_co2<-tot_env_co2+env_ordre[2,i]*decay_building*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_reemploi_site<-som_reemploi_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+								som_reutilisation_site<-som_reutilisation_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+								som_reemploi_hors_site<-som_reemploi_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+								som_reutilisation_hors_site<-som_reutilisation_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
+								tot_reemploi_site<-tot_reemploi_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[0,i];
+								tot_reutilisation_site<-tot_reutilisation_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[1,i];
+								tot_reemploi_hors_site<-tot_reemploi_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[2,i];
+								tot_reutilisation_hors_site<-tot_reutilisation_hors_site+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[3,i];
+								list_reemploi[j].capacite<-list_reemploi[j].capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								total_capacite4<-total_capacite4-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_cout<-som_cout+cout_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								tot_cout<-tot_cout+cout_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								tot_env_eau<-tot_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								tot_env_energie<-tot_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
+								tot_env_co2<-tot_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[0,i]+note_ordre[1,i]+note_ordre[2,i]+note_ordre[3,i]);
 								find_new_reemploi<-true;
 							}
 						}
 					}
 					
 					// et le reste en valorisation
-					if(centre_val.capacite>=(decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i])) and centre_val.info_capacite[i]!=0.0 and centre_val.info_acteur[i+8]="1"){
+					if(centre_val.capacite>=(entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i])) and centre_val.info_capacite[i]!=0.0 and centre_val.info_acteur[i+8]="1"){
 						
-						centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+decay_building*note_ordre[5,i];
-						centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+decay_building*note_ordre[6,i];
-						centre_val.REP[i]<-centre_val.REP[i]+decay_building*note_ordre[7,i];
+						centre_val.valo_matiere[i]<-centre_val.valo_matiere[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+						centre_val.valo_energetique[i]<-centre_val.valo_energetique[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+						centre_val.REP[i]<-centre_val.REP[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
 						
-						som_valo_matiere<-som_valo_matiere+decay_building*note_ordre[5,i];
-						som_valo_energetique<-som_valo_energetique+decay_building*note_ordre[6,i];
-						som_REP<-som_REP+decay_building*note_ordre[7,i];
-						tot_valo_matiere<-tot_valo_matiere+decay_building*note_ordre[5,i];
-						tot_valo_energetique<-tot_valo_energetique+decay_building*note_ordre[6,i];
-						tot_REP<-tot_REP+decay_building*note_ordre[7,i];
-						centre_val.capacite<-centre_val.capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						tot_cout<-tot_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						tot_env_eau<-tot_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						tot_env_energie<-tot_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-						tot_env_co2<-tot_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_valo_matiere<-som_valo_matiere+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+						som_valo_energetique<-som_valo_energetique+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+						som_REP<-som_REP+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
+						tot_valo_matiere<-tot_valo_matiere+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+						tot_valo_energetique<-tot_valo_energetique+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+						tot_REP<-tot_REP+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
+						centre_val.capacite<-centre_val.capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						total_capacite2<-total_capacite2-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_cout<-som_cout+cout_ordre[3,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_eau<-som_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_energie<-som_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						som_env_co2<-som_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						tot_cout<-tot_cout+cout_ordre[3,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						tot_env_eau<-tot_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						tot_env_energie<-tot_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+						tot_env_co2<-tot_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 					}
 					
 					else{ // Si le centre de valo le plus proche n'a plus la capacité on va chercher le centre de valo le plus proche ayant la capacité nécessaire
 						loop j from:0 to:length(list_valo)-1{
-							if(list_valo[j].capacite>=decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and list_valo[j].info_capacite[i]!=0.0 and find_new_centre_valo=false){
+							if(list_valo[j].capacite>=entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]) and list_valo[j].info_acteur[i+8]="1" and list_valo[j].info_capacite[i]!=0.0 and find_new_centre_valo=false){
 								
-								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+decay_building*note_ordre[5,i];
-								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+decay_building*note_ordre[6,i];
-								list_valo[j].REP[i]<-list_valo[j].REP[i]+decay_building*note_ordre[7,i];
+								list_valo[j].valo_matiere[i]<-list_valo[j].valo_matiere[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+								list_valo[j].valo_energetique[i]<-list_valo[j].valo_energetique[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+								list_valo[j].REP[i]<-list_valo[j].REP[i]+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
 								
-								som_valo_matiere<-som_valo_matiere+decay_building*note_ordre[5,i];
-								som_valo_energetique<-som_valo_energetique+decay_building*note_ordre[6,i];
-								som_REP<-som_REP+decay_building*note_ordre[7,i];
-								tot_valo_matiere<-tot_valo_matiere+decay_building*note_ordre[5,i];
-								tot_valo_energetique<-tot_valo_energetique+decay_building*note_ordre[6,i];
-								tot_REP<-tot_REP+decay_building*note_ordre[7,i];
-								list_valo[j].capacite<-list_valo[j].capacite-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								total_capacite2<-total_capacite2-decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								som_cout<-som_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								som_env_eau<-som_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								som_env_energie<-som_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								som_env_co2<-som_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								tot_cout<-tot_cout+cout_ordre[3,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								tot_env_eau<-tot_env_eau+env_ordre[0,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								tot_env_energie<-tot_env_energie+env_ordre[1,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
-								tot_env_co2<-tot_env_co2+env_ordre[2,i]*decay_building*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_valo_matiere<-som_valo_matiere+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+								som_valo_energetique<-som_valo_energetique+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+								som_REP<-som_REP+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
+								tot_valo_matiere<-tot_valo_matiere+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[5,i];
+								tot_valo_energetique<-tot_valo_energetique+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[6,i];
+								tot_REP<-tot_REP+entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*note_ordre[7,i];
+								list_valo[j].capacite<-list_valo[j].capacite-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								total_capacite2<-total_capacite2-entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_cout<-som_cout+cout_ordre[3,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_eau<-som_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_energie<-som_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								som_env_co2<-som_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								tot_cout<-tot_cout+cout_ordre[3,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								tot_env_eau<-tot_env_eau+env_ordre[0,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								tot_env_energie<-tot_env_energie+env_ordre[1,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
+								tot_env_co2<-tot_env_co2+env_ordre[2,i]*entreprise_demolition.info_capacite[i]*nb_heure*nb_ouvrier*(note_ordre[5,i]+note_ordre[6,i]+note_ordre[7,i]);
 								find_new_centre_valo<-true;
 							}
 						}
@@ -1227,11 +1252,11 @@ species people skills:[moving]{ // Unité opérative
 					
 						som_stockage_ISDI<-som_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
 						som_stockage_ISDND<-som_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
-						som_stockage_ISDI<-som_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+						som_stockage_ISDD<-som_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
 						som_autre_elimination<-som_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 						tot_stockage_ISDI<-tot_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
 						tot_stockage_ISDND<-tot_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
-						tot_stockage_ISDI<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+						tot_stockage_ISDD<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
 						tot_autre_elimination<-tot_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 						centre_enfouissement.capacite<-centre_enfouissement.capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 						total_capacite3<-total_capacite3-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -1256,11 +1281,11 @@ species people skills:[moving]{ // Unité opérative
 								
 								som_stockage_ISDI<-som_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
 								som_stockage_ISDND<-som_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
-								som_stockage_ISDI<-som_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+								som_stockage_ISDD<-som_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
 								som_autre_elimination<-som_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 								tot_stockage_ISDI<-tot_stockage_ISDI+batiment.materiaux[0,i]*note_ordre[8,i];
 								tot_stockage_ISDND<-tot_stockage_ISDND+batiment.materiaux[0,i]*note_ordre[9,i];
-								tot_stockage_ISDI<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
+								tot_stockage_ISDD<-tot_stockage_ISDD+batiment.materiaux[0,i]*note_ordre[10,i];
 								tot_autre_elimination<-tot_autre_elimination+batiment.materiaux[0,i]*note_ordre[11,i];
 								list_enfouissement[j].capacite<-list_enfouissement[j].capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
 								total_capacite<-total_capacite-batiment.materiaux[0,i]*(note_ordre[8,i]+note_ordre[9,i]+note_ordre[10,i]+note_ordre[11,i]);
@@ -1542,7 +1567,7 @@ species people skills:[moving]{ // Unité opérative
 			centre_trie<-list_traitement[0]; // Le centre de tri principal de l'agent est celui le plus proche
 			centre_val<-list_valo[0]; // Le centre de valo principal de l'agent est celui le plus proche
 			centre_reemploi<-list_reemploi[0];
-			save[name,entreprise_demolition.id_acteur,batiment.name,centre_trie.id_acteur,centre_val.id_acteur,centre_reemploi.id_acteur,centre_enfouissement.id_acteur] to: "../Results/qui_fait_quoi.csv" type:"csv" rewrite: false;
+			save[name,entreprise_demolition.id_acteur,batiment.name] to: "../Results/qui_fait_quoi.csv" type:"csv" rewrite: false;
 		}
 		
 		else if the_target=location and materiaux=0.0{
@@ -1566,7 +1591,7 @@ experiment RECONVERT type: gui {
 	parameter "Note" var: note min:0 max:4 category: "Parametres" ;
 	parameter "Nb heure" var: nb_heure min:1  category: "Parametres" ;
 	parameter "Nb_ouvrier" var: nb_ouvrier min:1  category: "Parametres" ;
-	parameter "decay_building" var: decay_building  category: "Parametres" ;
+	parameter "Step" var: step  category: "Parametres" ;
 	
 	output {
 		
@@ -1660,9 +1685,10 @@ experiment RECONVERT type: gui {
 		tot_reemploi_hors_site<-0.0;
 		tot_reutilisation_site<-0.0;
 		tot_reutilisation_hors_site<-0.0;
+		calcul_step<-calcul_step+step;
 	}
-	
-	reflex save{
+	reflex save when: calcul_step>=1#month{
+		calcul_step<-0;
 		save [som_cout,som_env_eau,som_env_energie,som_env_co2,som_envoi_tri,som_stockage_ISDI,som_stockage_ISDND,som_stockage_ISDD,som_autre_elimination,som_valo_matiere,som_valo_energetique,som_REP,som_reemploi_site,som_reemploi_hors_site,som_reutilisation_site,som_reutilisation_hors_site] to: "../Results/cumulée.csv" type:"csv" rewrite: false;
 	}
 }
